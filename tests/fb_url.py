@@ -1,3 +1,0 @@
-from reaper.utils.encoding import decode_alphanumeric_id
-
-print(decode_alphanumeric_id("pfbid02t4kT4kTPmM11P3Fa8w6qCCeZecgGoEuNhMbrw93UYAveshXD4fRSyhc7YyaoMx9yl"))
