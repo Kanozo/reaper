@@ -1,0 +1,1 @@
+"""reaper/network — Capa de red: interceptor y fetcher de contenido."""
