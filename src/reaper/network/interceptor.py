@@ -197,6 +197,15 @@ class FetchResult:
         authenticated:     True si la sesión usó cookies de autenticación.
         account_id:        ID de la cuenta usada para la sesión autenticada.
         debug_session_dir: Path al directorio de debug. None si debug=False.
+        updated_cookies:   Cookies leídas del contexto Playwright después de
+                           la navegación. El servidor puede haber emitido
+                           cabeceras ``Set-Cookie`` que extienden el TTL o
+                           rotan tokens de seguridad de corta vida.
+                           ``BaseScraper._fetch_with_account()`` compara este
+                           campo con las cookies originales y persiste las
+                           actualizadas si difieren, alargando automáticamente
+                           la vida de la sesión sin necesidad de login manual.
+                           ``None`` en sesiones anónimas o si la lectura falló.
 
     Notes:
         Los parsers deben usar ``traffic.graphql_responses`` para datos
@@ -213,6 +222,11 @@ class FetchResult:
     authenticated: bool = False
     account_id: str | None = None
     debug_session_dir: Path | None = None
+    # Cookies post-navegación leídas del contexto de Playwright.
+    # El servidor emite Set-Cookie en cada respuesta exitosa, actualizando
+    # tokens de corta vida y extendiendo el TTL de las cookies de sesión.
+    # None en sesiones anónimas (cookies=None al llamar a fetch()).
+    updated_cookies: list[dict] | None = None
 
 
 # ============================================================================

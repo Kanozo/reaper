@@ -1,17 +1,40 @@
 site_name: Reaper
-site_description: Librería Python para scraping de Facebook e Instagram
+site_description: Librería Python para scraping de Facebook e Instagram con soporte de cuentas autenticadas
+site_author: Reaper Contributors
 docs_dir: docs
 site_dir: docs_build
 
 theme:
   name: material
   palette:
-    scheme: slate
+    - scheme: slate
+      primary: deep orange
+      accent: orange
   features:
     - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
-    - toc.integrate
+    - navigation.expand
+    - navigation.top
+    - toc.follow
     - content.code.copy
+    - content.code.annotate
+  font:
+    code: JetBrains Mono
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - toc:
+      permalink: true
 
 plugins:
   - search
@@ -19,11 +42,46 @@ plugins:
       handlers:
         python:
           paths: [src]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            unwrap_annotated: true
+            merge_init_into_class: true
 
 nav:
   - Inicio: index.md
+
   - Manual de Usuario:
-      - Cuentas Autenticadas: user/auth.md
+    - Instalación: user/installation.md
+    - Scraping sin cuentas: user/anonymous.md
+    - Cuentas autenticadas: user/accounts.md
+    - Login interactivo: user/login.md
+    - Gestión del pool: user/pool.md
+    - Proxies: user/proxy.md
+    - Modo debug: user/debug.md
+    - Preguntas frecuentes: user/faq.md
+
   - Referencia Técnica:
-      - Arquitectura General: technical/reference.md
-      - Módulo Auth: technical/auth.md
+    - Arquitectura: technical/architecture.md
+    - Pipeline de scraping: technical/pipeline.md
+    - Sistema de autenticación: technical/auth.md
+    - Parsers: technical/parsers.md
+    - Resultados por tipo: technical/results.md
+    - Extender Reaper: technical/extending.md
+
+  - API Reference:
+    - reaper (público): api/public.md
+    - reaper.auth: api/auth.md
+    - reaper.config: api/config.md
+    - reaper.network: api/network.md
+    - reaper.scrapers: api/scrapers.md
+    - reaper.parsers: api/parsers.md
+    - reaper.utils: api/utils.md
+
+  - Changelog: changelog.md

@@ -436,6 +436,29 @@ class ContentFetcher:
                 self._html_content = await page.content()
                 self._final_url = page.url
 
+                # ── Captura de cookies actualizadas post-navegación ───────────
+                # Cuando la sesión es autenticada, el servidor emite cabeceras
+                # Set-Cookie en cada respuesta que renuevan tokens de corta vida
+                # y extienden el TTL de las cookies de sesión. Playwright acumula
+                # estos cambios en el contexto automáticamente durante la sesión.
+                # BaseScraper._fetch_with_account() comparará este valor con las
+                # cookies originales y persistirá las actualizadas si difieren,
+                # alargando la vida de la sesión sin necesidad de login manual.
+                # Solo se leen cuando la sesión era autenticada (cookies != None)
+                # para no incurrir en el coste de context.cookies() en modo anónimo.
+                if cookies is not None:
+                    try:
+                        self._updated_cookies: list[dict] | None = await context.cookies()
+                    except Exception as _exc:
+                        # No es un error crítico: la petición fue exitosa.
+                        # El auto-refresh simplemente no ocurrirá en esta iteración.
+                        logger.debug(
+                            "No se pudieron leer las cookies post-navegación: %s", _exc
+                        )
+                        self._updated_cookies = None
+                else:
+                    self._updated_cookies = None
+
                 if self.debug:
                     session_dir = await self._save_debug_artifacts(page, interceptor, result)
                     result.debug_session_dir = session_dir
@@ -446,6 +469,7 @@ class ContentFetcher:
             result.html_content = self._html_content
             result.final_url = self._final_url
             result.traffic = interceptor.get_traffic()
+            result.updated_cookies = getattr(self, "_updated_cookies", None)
             result.success = True
             logger.info("Contenido obtenido. Tráfico: %s", result.traffic.summary())
 
