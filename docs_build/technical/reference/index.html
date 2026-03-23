@@ -1,0 +1,2037 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Librería Python para scraping de Facebook e Instagram">
+      
+      
+      
+      
+        <link rel="prev" href="../../user/auth/">
+      
+      
+        <link rel="next" href="../auth/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Arquitectura General - Reaper</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#reaper-referencia-tecnica-modulo-de-autenticacion-y-rotacion-de-cuentas" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Reaper" class="md-header__button md-logo" aria-label="Reaper" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Reaper
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Arquitectura General
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Inicio
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user/auth/" class="md-tabs__link">
+          
+  
+  
+  Manual de Usuario
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Referencia Técnica
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Reaper" class="md-nav__button md-logo" aria-label="Reaper" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Reaper
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual de Usuario
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Manual de Usuario
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user/auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cuentas Autenticadas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referencia Técnica
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Referencia Técnica
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitectura General
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitectura General
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tabla-de-contenidos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tabla de Contenidos
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-vision-general-de-la-arquitectura" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Visión general de la arquitectura
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Visión general de la arquitectura">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#principio-de-flujo-de-datos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Principio de flujo de datos
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-estructura-del-modulo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Estructura del módulo
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Estructura del módulo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#archivos-de-la-libreria-modificados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archivos de la librería modificados
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-modelos-de-datos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Modelos de datos
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Modelos de datos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#accountstatus-estado-operativo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AccountStatus — estado operativo
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accountactivity-historial-y-metricas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AccountActivity — historial y métricas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accountprofile-perfil-completo-de-una-cuenta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AccountProfile — perfil completo de una cuenta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#serializacion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Serialización
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-sistema-de-almacenamiento" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Sistema de almacenamiento
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Sistema de almacenamiento">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#estructura-en-disco-localfilestorage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Estructura en disco (LocalFileStorage)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interfaz-abstracta-baseaccountstorage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interfaz abstracta BaseAccountStorage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#localfilestorage-metodos-adicionales-para-cookies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LocalFileStorage — métodos adicionales para cookies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-algoritmo-de-rotacion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Algoritmo de rotación
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Algoritmo de rotación">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#formula-de-puntuacion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fórmula de puntuación
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#penalizaciones-multiplicativas-por-estado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Penalizaciones multiplicativas por estado
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ejemplo-de-ranking-con-3-cuentas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ejemplo de ranking con 3 cuentas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ajuste-de-pesos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ajuste de pesos
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-accountmanager-api-completa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. AccountManager — API completa
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. AccountManager — API completa">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crud-de-cuentas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CRUD de cuentas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gestion-de-cookies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Gestión de cookies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rotacion-y-registro-de-actividad" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rotación y registro de actividad
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diagnostico" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagnóstico
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-flujo-de-login-interactivo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Flujo de login interactivo
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Flujo de login interactivo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#por-que-es-manual" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Por qué es manual
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-programatica" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API programática
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deteccion-de-login-exitoso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detección de login exitoso
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inyeccion-de-cookies-en-playwright" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inyección de cookies en Playwright
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inyeccion-en-el-navegador-durante-el-scraping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inyección en el navegador durante el scraping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-integracion-con-el-pipeline-de-scraping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Integración con el pipeline de scraping
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Integración con el pipeline de scraping">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basescraper_fetch_with_account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BaseScraper._fetch_with_account()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cambios-en-scraperconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cambios en ScraperConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cambios-en-reaper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cambios en Reaper
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-ciclo-de-vida-de-una-cuenta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Ciclo de vida de una cuenta
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-migracion-a-base-de-datos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Migración a base de datos
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-referencia-de-constantes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Referencia de constantes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Referencia de constantes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#reaperauthmodelspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reaper/auth/models.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reaperauthrotatorpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reaper/auth/rotator.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reaperauthaccount_managerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reaper/auth/account_manager.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reaperauthloginpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reaper/auth/login.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-diagramas-de-flujo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Diagramas de flujo
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="12. Diagramas de flujo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#seleccion-de-cuenta-en-_fetch_with_account" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Selección de cuenta en _fetch_with_account()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ciclo-de-refresco-automatico" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ciclo de refresco automático
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-testing-del-modulo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Testing del módulo
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="13. Testing del módulo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tests-unitarios-incluidos-ejecutados-durante-el-desarrollo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests unitarios incluidos (ejecutados durante el desarrollo)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#como-anadir-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cómo añadir tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Módulo Auth
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="reaper-referencia-tecnica-modulo-de-autenticacion-y-rotacion-de-cuentas">Reaper — Referencia Técnica: Módulo de Autenticación y Rotación de Cuentas</h1>
+<blockquote>
+<p><strong>Versión</strong>: 0.2.0 | <strong>Python</strong>: 3.11+ | <strong>Módulo</strong>: <code>reaper.auth</code></p>
+</blockquote>
+<hr />
+<h2 id="tabla-de-contenidos">Tabla de Contenidos</h2>
+<ol>
+<li><a href="#1-visión-general-de-la-arquitectura">Visión general de la arquitectura</a></li>
+<li><a href="#2-estructura-del-módulo">Estructura del módulo</a></li>
+<li><a href="#3-modelos-de-datos">Modelos de datos</a></li>
+<li><a href="#4-sistema-de-almacenamiento">Sistema de almacenamiento</a></li>
+<li><a href="#5-algoritmo-de-rotación">Algoritmo de rotación</a></li>
+<li><a href="#6-accountmanager--api-completa">AccountManager — API completa</a></li>
+<li><a href="#7-flujo-de-login-interactivo">Flujo de login interactivo</a></li>
+<li><a href="#8-integración-con-el-pipeline-de-scraping">Integración con el pipeline de scraping</a></li>
+<li><a href="#9-ciclo-de-vida-de-una-cuenta">Ciclo de vida de una cuenta</a></li>
+<li><a href="#10-migración-a-base-de-datos">Migración a base de datos</a></li>
+<li><a href="#11-referencia-de-constantes">Referencia de constantes</a></li>
+<li><a href="#12-diagramas-de-flujo">Diagramas de flujo</a></li>
+<li><a href="#13-testing-del-módulo">Testing del módulo</a></li>
+</ol>
+<hr />
+<h2 id="1-vision-general-de-la-arquitectura">1. Visión general de la arquitectura</h2>
+<p>El módulo <code>reaper.auth</code> añade gestión de sesiones autenticadas al pipeline de scraping existente sin romper ninguna interfaz pública. El diseño sigue tres principios:</p>
+<p><strong>Compatibilidad hacia atrás total.</strong> Cualquier código que usara Reaper 0.1.x sigue funcionando sin modificaciones. El campo <code>account_manager</code> en <code>ScraperConfig</code> es <code>None</code> por defecto; cuando es <code>None</code>, el comportamiento es idéntico al original.</p>
+<p><strong>Separación de responsabilidades.</strong> Cada componente tiene un propósito único: los modelos solo representan datos, el storage solo persiste, el rotador solo puntúa, el manager coordina. Ninguna capa conoce los detalles internos de la anterior.</p>
+<p><strong>Extensibilidad explícita.</strong> La interfaz <code>BaseAccountStorage</code> está diseñada para ser implementada. Migrar de archivos JSON a PostgreSQL o MongoDB requiere implementar cinco métodos abstractos y pasar la nueva instancia al constructor del manager.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│  API pública  reaper/__init__.py                                │
+│  scrape(account_manager=...)  |  Reaper(account_manager=...)   │
+├─────────────────────────────────────────────────────────────────┤
+│  AccountManager  auth/account_manager.py                        │
+│  add_account | import_cookies | get_account_for_request         │
+│  record_success | record_failure | pool_summary                 │
+├──────────────────────┬──────────────────────────────────────────┤
+│  AccountRotator      │  BaseAccountStorage                      │
+│  auth/rotator.py     │  auth/storage/base.py                    │
+│  _score()            │       ↓                                  │
+│  _rank()             │  LocalFileStorage                        │
+│  select()            │  auth/storage/local.py                   │
+├──────────────────────┴──────────────────────────────────────────┤
+│  Modelos  auth/models.py                                        │
+│  AccountProfile | AccountActivity | AccountStatus               │
+├─────────────────────────────────────────────────────────────────┤
+│  Login interactivo  auth/login.py                               │
+│  run_login_new_account | run_login_refresh | _cli_main          │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="principio-de-flujo-de-datos">Principio de flujo de datos</h3>
+<pre><code>scrape(url, account_manager=manager)
+  → Reaper(account_manager)
+    → ScraperConfig(account_manager=manager)
+      → FacebookScraper._fetch_with_account(&quot;facebook&quot;)
+          → manager.get_account_for_request(&quot;facebook&quot;)   ← rotador
+          → local_storage.load_cookies(platform, id)      ← disco
+          → ContentFetcher.fetch(cookies=cookies)          ← Playwright
+          → manager.record_success/failure(id)            ← actividad
+</code></pre>
+<hr />
+<h2 id="2-estructura-del-modulo">2. Estructura del módulo</h2>
+<pre><code>src/reaper/auth/
+├── __init__.py              Re-exportaciones del API público del módulo
+├── models.py                Modelos de datos: AccountProfile, AccountActivity, AccountStatus
+├── rotator.py               Algoritmo de scoring y selección de cuenta
+├── account_manager.py       Gestor central: CRUD, cookies, rotación
+├── login.py                 Flujo interactivo de login con Playwright
+└── storage/
+    ├── __init__.py
+    ├── base.py              ABC: BaseAccountStorage, StorageError
+    └── local.py             Implementación en archivos JSON: LocalFileStorage
+</code></pre>
+<h3 id="archivos-de-la-libreria-modificados">Archivos de la librería modificados</h3>
+<table>
+<thead>
+<tr>
+<th>Archivo</th>
+<th>Cambio</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>reaper/__init__.py</code></td>
+<td>Exporta <code>AccountManager</code>, <code>AccountProfile</code>, <code>AccountStatus</code>. <code>scrape()</code> acepta <code>account_manager</code>. Versión → 0.2.0</td>
+</tr>
+<tr>
+<td><code>reaper/core.py</code></td>
+<td><code>Reaper.__init__</code> acepta <code>account_manager</code> y lo propaga a <code>ScraperConfig</code></td>
+</tr>
+<tr>
+<td><code>reaper/config.py</code></td>
+<td>Campo <code>account_manager: Any = None</code> + propiedad <code>has_account_manager</code></td>
+</tr>
+<tr>
+<td><code>reaper/scrapers/base.py</code></td>
+<td>Método nuevo <code>_fetch_with_account()</code>. <code>_fetch()</code> ahora es abstracto con parámetro <code>cookies</code></td>
+</tr>
+<tr>
+<td><code>reaper/scrapers/facebook.py</code></td>
+<td><code>run()</code> llama <code>_fetch_with_account("facebook")</code>. <code>_fetch()</code> acepta <code>cookies</code></td>
+</tr>
+<tr>
+<td><code>reaper/scrapers/instagram.py</code></td>
+<td>Mismo patrón que Facebook</td>
+</tr>
+<tr>
+<td><code>reaper/network/content_fetcher.py</code></td>
+<td><code>fetch()</code> acepta <code>cookies: list[dict] \| None</code>. Inyección vía <code>context.add_cookies()</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-modelos-de-datos">3. Modelos de datos</h2>
+<h3 id="accountstatus-estado-operativo"><code>AccountStatus</code> — estado operativo</h3>
+<pre><code class="language-python">class AccountStatus(str, Enum):
+    ACTIVE        = &quot;active&quot;          # Operativa, cookies válidas
+    SUSPENDED     = &quot;suspended&quot;       # Bloqueada por la plataforma — NO seleccionable
+    RATE_LIMITED  = &quot;rate_limited&quot;    # Recibió señales de throttling — penalizada en score
+    COOKIE_EXPIRED= &quot;cookie_expired&quot;  # Cookies inválidas — NO seleccionable
+    NEEDS_REFRESH = &quot;needs_refresh&quot;   # Umbral de refresco alcanzado — penalizada
+    UNKNOWN       = &quot;unknown&quot;         # Estado inicial, sin verificar
+</code></pre>
+<p>Los estados <code>SUSPENDED</code> y <code>COOKIE_EXPIRED</code> son los únicos que impiden la selección de la cuenta por el rotador. Los demás son seleccionables con distintos grados de penalización en el score.</p>
+<h3 id="accountactivity-historial-y-metricas"><code>AccountActivity</code> — historial y métricas</h3>
+<pre><code class="language-python">@dataclass
+class AccountActivity:
+    total_requests: int                    # Total acumulado de peticiones
+    successful_requests: int               # Peticiones con datos extraídos
+    failed_requests: int                   # Peticiones con error
+    last_used_at: str | None               # ISO-8601 del último uso
+    last_success_at: str | None            # ISO-8601 del último éxito
+    last_error_at: str | None              # ISO-8601 del último error
+    recent_errors: list[str]               # FIFO últimos 20 errores con timestamp
+    requests_since_cookie_refresh: int     # Contador reseteado al importar cookies
+</code></pre>
+<p>Propiedades derivadas:</p>
+<pre><code class="language-python">activity.success_rate   # float 0.0–1.0
+activity.failure_rate   # float 0.0–1.0
+</code></pre>
+<p>Métodos de mutación:</p>
+<pre><code class="language-python">activity.record_success()                    # Incrementa contadores de éxito
+activity.record_failure(&quot;HTTP 429&quot;)          # Incrementa contadores de fallo, añade error a FIFO
+activity.reset_cookie_refresh_counter()      # Resetea requests_since_cookie_refresh a 0
+</code></pre>
+<h3 id="accountprofile-perfil-completo-de-una-cuenta"><code>AccountProfile</code> — perfil completo de una cuenta</h3>
+<pre><code class="language-python">@dataclass
+class AccountProfile:
+    account_id: str              # UUID4 autogenerado
+    platform: str                # &quot;facebook&quot; | &quot;instagram&quot;
+    username: str                # Nombre legible del operador
+    email: str | None            # Email informativo
+    status: AccountStatus        # Estado operativo actual
+    cookies_path: str | None     # Ruta al cookies.json en disco (inferida por LocalFileStorage)
+    activity: AccountActivity    # Historial de actividad
+    created_at: str              # ISO-8601 de creación
+    updated_at: str              # ISO-8601 de última modificación
+    notes: str                   # Campo libre del operador
+</code></pre>
+<p>Propiedades de conveniencia:</p>
+<pre><code class="language-python">profile.has_cookies     # True si cookies_path existe en disco
+profile.is_selectable   # True si has_cookies AND status not in NON_SELECTABLE_STATUSES
+</code></pre>
+<h3 id="serializacion">Serialización</h3>
+<p>Todos los modelos implementan <code>to_dict()</code> / <code>from_dict()</code>:</p>
+<pre><code class="language-python"># Serializar
+data = profile.to_dict()           # dict con tipos primitivos
+json_str = json.dumps(data)        # serializable sin default=str
+
+# Deserializar
+profile = AccountProfile.from_dict(data)
+# Tolerante a versiones: campos ausentes usan valores por defecto
+</code></pre>
+<p>El campo <code>cookies_path</code> <strong>no se persiste</strong> en <code>account.json</code>. <code>LocalFileStorage</code> lo infiere de la ubicación del archivo en disco al deserializar. Esto evita rutas absolutas hardcodeadas que se rompan al mover el proyecto.</p>
+<hr />
+<h2 id="4-sistema-de-almacenamiento">4. Sistema de almacenamiento</h2>
+<h3 id="estructura-en-disco-localfilestorage">Estructura en disco (<code>LocalFileStorage</code>)</h3>
+<pre><code>data/accounts/                          ← accounts_dir (configurable)
+├── facebook/
+│   ├── 3f2e1a-uuid.../
+│   │   ├── account.json               ← perfil (sin cookies_path)
+│   │   └── cookies.json               ← cookies en formato Playwright
+│   └── otro-uuid.../
+│       ├── account.json
+│       └── cookies.json
+└── instagram/
+    └── uuid.../
+        ├── account.json
+        └── cookies.json
+</code></pre>
+<h3 id="interfaz-abstracta-baseaccountstorage">Interfaz abstracta <code>BaseAccountStorage</code></h3>
+<pre><code class="language-python">class BaseAccountStorage(ABC):
+    async def save(self, account: AccountProfile) -&gt; None: ...
+    async def load(self, account_id: str) -&gt; AccountProfile | None: ...
+    async def delete(self, account_id: str) -&gt; bool: ...
+    async def list_all(self, platform: str | None = None) -&gt; list[AccountProfile]: ...
+    async def update_activity(self, account_id: str, activity: AccountActivity) -&gt; bool: ...
+
+    # Implementado en base (sobreescribible):
+    async def exists(self, account_id: str) -&gt; bool: ...
+</code></pre>
+<p>La distinción entre <code>save()</code> y <code>update_activity()</code> es intencionada. <code>update_activity()</code> es una operación de alta frecuencia (se llama en cada petición) y los backends de BD pueden optimizarla con un <code>UPDATE</code> parcial. <code>save()</code> es para cambios de estado completos (raro).</p>
+<h3 id="localfilestorage-metodos-adicionales-para-cookies"><code>LocalFileStorage</code> — métodos adicionales para cookies</h3>
+<p><code>LocalFileStorage</code> extiende la interfaz abstracta con operaciones de cookies que no pertenecen a <code>BaseAccountStorage</code> (ya que en BD las cookies se guardarían como campos):</p>
+<pre><code class="language-python">storage = LocalFileStorage(&quot;data/accounts&quot;)
+
+# Ruta canónica de cookies (predecible, no requiere leer el JSON)
+path = storage.cookies_path_for(&quot;facebook&quot;, account_id)
+
+# Guardar cookies brutas desde memoria
+storage.save_cookies(&quot;facebook&quot;, account_id, cookies_list)
+
+# Leer cookies para inyectarlas en Playwright
+cookies = storage.load_cookies(&quot;facebook&quot;, account_id)
+</code></pre>
+<hr />
+<h2 id="5-algoritmo-de-rotacion">5. Algoritmo de rotación</h2>
+<p>El <code>AccountRotator</code> es <strong>stateless</strong>: recibe el pool completo de cuentas en cada llamada a <code>select()</code> y calcula el ranking en el momento. No necesita ser notificado de cambios.</p>
+<h3 id="formula-de-puntuacion">Fórmula de puntuación</h3>
+<pre><code>score = (success_rate × 0.6)
+      + (lru_score    × 0.3)
+      - (cookie_age   × 0.1)
+</code></pre>
+<p>Donde:</p>
+<ul>
+<li><strong><code>success_rate</code></strong>: <code>successful_requests / total_requests</code>. Cuentas sin historial = 1.0 (máximo).</li>
+<li><strong><code>lru_score</code></strong>: antigüedad de uso normalizada entre 0.0 y 1.0. La cuenta usada hace más tiempo recibe 1.0; la más reciente recibe 0.0. Cuentas nunca usadas reciben el máximo.</li>
+<li><strong><code>cookie_age</code></strong>: <code>requests_since_cookie_refresh / threshold</code>. Normalizado 0.0–1.0. Incentiva usar otras cuentas antes de que esta alcance el umbral.</li>
+</ul>
+<h3 id="penalizaciones-multiplicativas-por-estado">Penalizaciones multiplicativas por estado</h3>
+<table>
+<thead>
+<tr>
+<th>Estado</th>
+<th>Multiplicador</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ACTIVE</code></td>
+<td>×1.0 (sin penalización)</td>
+</tr>
+<tr>
+<td><code>NEEDS_REFRESH</code></td>
+<td>×0.5</td>
+</tr>
+<tr>
+<td><code>RATE_LIMITED</code></td>
+<td>×0.2</td>
+</tr>
+</tbody>
+</table>
+<p>Los estados <code>SUSPENDED</code> y <code>COOKIE_EXPIRED</code> se filtran antes de puntuar: nunca llegan al algoritmo.</p>
+<h3 id="ejemplo-de-ranking-con-3-cuentas">Ejemplo de ranking con 3 cuentas</h3>
+<table>
+<thead>
+<tr>
+<th>Cuenta</th>
+<th>success_rate</th>
+<th>lru_score</th>
+<th>cookie_age</th>
+<th>score bruto</th>
+<th>penalización</th>
+<th>score final</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cuenta_nueva</td>
+<td>1.00</td>
+<td>1.00</td>
+<td>0.00</td>
+<td>0.90</td>
+<td>×1.0</td>
+<td><strong>0.90</strong></td>
+</tr>
+<tr>
+<td>cuenta_activa</td>
+<td>0.85</td>
+<td>0.40</td>
+<td>0.60</td>
+<td>0.57</td>
+<td>×1.0</td>
+<td><strong>0.57</strong></td>
+</tr>
+<tr>
+<td>rate_limited</td>
+<td>0.70</td>
+<td>0.60</td>
+<td>0.20</td>
+<td>0.58</td>
+<td>×0.2</td>
+<td><strong>0.12</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="ajuste-de-pesos">Ajuste de pesos</h3>
+<p>Los pesos son constantes en <code>rotator.py</code> y pueden modificarse sin tocar el algoritmo:</p>
+<pre><code class="language-python"># reaper/auth/rotator.py
+WEIGHT_SUCCESS_RATE: float = 0.6
+WEIGHT_LEAST_RECENTLY_USED: float = 0.3
+WEIGHT_COOKIE_AGE: float = 0.1
+RATE_LIMITED_PENALTY: float = 0.2
+NEEDS_REFRESH_PENALTY: float = 0.5
+</code></pre>
+<hr />
+<h2 id="6-accountmanager-api-completa">6. AccountManager — API completa</h2>
+<pre><code class="language-python">from reaper.auth import AccountManager
+
+manager = AccountManager(
+    storage=None,                    # None = usa LocalFileStorage
+    accounts_dir=&quot;data/accounts&quot;,    # Ignorado si storage != None
+    cookie_refresh_threshold=50,     # Peticiones exitosas antes de NEEDS_REFRESH
+)
+</code></pre>
+<h3 id="crud-de-cuentas">CRUD de cuentas</h3>
+<pre><code class="language-python"># Crear cuenta nueva (sin cookies todavía)
+profile = await manager.add_account(
+    platform=&quot;facebook&quot;,
+    username=&quot;mi_usuario@gmail.com&quot;,
+    email=&quot;mi_usuario@gmail.com&quot;,    # opcional
+    notes=&quot;cuenta principal&quot;,         # opcional
+)
+
+# Crear cuenta con cookies inline
+profile = await manager.add_account(
+    platform=&quot;instagram&quot;,
+    username=&quot;ig_user&quot;,
+    cookies=[{&quot;name&quot;: &quot;sessionid&quot;, &quot;value&quot;: &quot;abc123&quot;, ...}],
+)
+
+# Crear cuenta con cookies desde archivo externo
+profile = await manager.add_account(
+    platform=&quot;facebook&quot;,
+    username=&quot;otro_usuario&quot;,
+    cookies_file=&quot;exports/facebook_cookies.json&quot;,
+)
+
+# Leer un perfil
+profile = await manager.get_account(account_id)
+
+# Listar todas (o filtrar por plataforma)
+todas   = await manager.list_accounts()
+solo_fb = await manager.list_accounts(&quot;facebook&quot;)
+solo_ig = await manager.list_accounts(&quot;instagram&quot;)
+
+# Actualizar estado manualmente
+await manager.update_status(account_id, AccountStatus.ACTIVE, notes=&quot;Reactivada&quot;)
+
+# Eliminar (perfil + cookies)
+deleted = await manager.remove_account(account_id)  # bool
+</code></pre>
+<h3 id="gestion-de-cookies">Gestión de cookies</h3>
+<pre><code class="language-python"># Importar cookies desde lista en memoria (formato Playwright)
+await manager.import_cookies(account_id, cookies_list)
+
+# Importar desde archivo JSON externo
+await manager.import_cookies_from_file(account_id, &quot;ruta/al/cookies.json&quot;)
+
+# Exportar cookies actuales
+cookies = await manager.export_cookies(account_id)  # list[dict] | None
+</code></pre>
+<p><code>import_cookies()</code> siempre:
+1. Guarda las cookies en disco bajo <code>{accounts_dir}/{platform}/{account_id}/cookies.json</code>.
+2. Actualiza <code>profile.cookies_path</code> con la ruta canónica.
+3. Resetea <code>activity.requests_since_cookie_refresh</code> a 0.
+4. Establece <code>profile.status = AccountStatus.ACTIVE</code>.</p>
+<h3 id="rotacion-y-registro-de-actividad">Rotación y registro de actividad</h3>
+<pre><code class="language-python"># Seleccionar la mejor cuenta para una petición (llamado por los scrapers)
+account = await manager.get_account_for_request(&quot;facebook&quot;)
+# Retorna None si no hay cuentas disponibles → modo anónimo
+
+# Registrar resultado (llamado por BaseScraper._fetch_with_account)
+await manager.record_success(account_id)
+await manager.record_failure(account_id, &quot;HTTP 429 Too Many Requests&quot;)
+</code></pre>
+<p><code>record_success()</code> verifica automáticamente si <code>requests_since_cookie_refresh &gt;= threshold</code>. Si se alcanza, marca la cuenta como <code>NEEDS_REFRESH</code> y emite un <code>WARNING</code> en los logs con el comando exacto para refrescar.</p>
+<p><code>record_failure()</code> evalúa si la tasa de fallos en la ventana reciente supera el 80% y marca la cuenta como <code>RATE_LIMITED</code> si se cumplen <code>CONSECUTIVE_FAILURES_FOR_RATE_LIMIT</code> fallos.</p>
+<h3 id="diagnostico">Diagnóstico</h3>
+<pre><code class="language-python"># Resumen agregado del pool
+summary = await manager.pool_summary()
+# {
+#     &quot;total&quot;: 5, &quot;active&quot;: 3, &quot;needs_refresh&quot;: 1,
+#     &quot;rate_limited&quot;: 1, &quot;suspended&quot;: 0, ...
+#     &quot;by_platform&quot;: {&quot;facebook&quot;: {...}, &quot;instagram&quot;: {...}}
+# }
+
+# Ranking detallado con scores
+ranked = await manager.get_ranked_accounts(&quot;facebook&quot;)
+# [
+#     {&quot;rank&quot;: 1, &quot;username&quot;: &quot;cuenta_a&quot;, &quot;score&quot;: 0.87, &quot;success_rate&quot;: 0.95, ...},
+#     {&quot;rank&quot;: 2, &quot;username&quot;: &quot;cuenta_b&quot;, &quot;score&quot;: 0.61, ...},
+# ]
+</code></pre>
+<hr />
+<h2 id="7-flujo-de-login-interactivo">7. Flujo de login interactivo</h2>
+<h3 id="por-que-es-manual">Por qué es manual</h3>
+<p>Facebook e Instagram detectan con alta precisión los intentos de login automatizado mediante Playwright. El enfoque manual es intrínsecamente más robusto: el usuario interactúa con el navegador de forma normal, incluyendo 2FA, verificaciones de dispositivo y CAPTCHAs que no pueden resolverse programáticamente.</p>
+<h3 id="api-programatica">API programática</h3>
+<pre><code class="language-python">from reaper.auth.login import run_login_new_account, run_login_refresh
+from reaper.auth import AccountManager
+
+manager = AccountManager()
+
+# Registrar cuenta nueva completa (abre Firefox, espera login, guarda en manager)
+profile = await run_login_new_account(
+    manager=manager,
+    platform=&quot;facebook&quot;,
+    username=&quot;usuario@gmail.com&quot;,
+    email=&quot;usuario@gmail.com&quot;,   # opcional
+    notes=&quot;cuenta A&quot;,             # opcional
+)
+if profile:
+    print(f&quot;Registrada: {profile.account_id}&quot;)
+
+# Refrescar cookies de cuenta existente
+ok = await run_login_refresh(
+    manager=manager,
+    account_id=&quot;3f2e1a-...&quot;,
+)
+</code></pre>
+<h3 id="deteccion-de-login-exitoso">Detección de login exitoso</h3>
+<p><code>_wait_for_login_success()</code> sondea <code>page.url</code> cada segundo buscando estos patrones:</p>
+<p><strong>Facebook:</strong></p>
+<pre><code>facebook.com/?
+facebook.com/home
+facebook.com/me
+facebook.com/feed
+facebook.com/?sk=h_chr
+</code></pre>
+<p><strong>Instagram:</strong></p>
+<pre><code>instagram.com/?
+instagram.com/accounts/onetap
+instagram.com/accounts/login/two_factor
+</code></pre>
+<p>El timeout por defecto es 300 segundos (5 minutos), configurable vía <code>LOGIN_TIMEOUT_SECONDS</code>.</p>
+<h3 id="inyeccion-de-cookies-en-playwright">Inyección de cookies en Playwright</h3>
+<p>Las cookies capturadas con <code>context.cookies()</code> son una lista de dicts en formato Playwright:</p>
+<pre><code class="language-python">[
+    {
+        &quot;name&quot;: &quot;c_user&quot;,
+        &quot;value&quot;: &quot;123456789&quot;,
+        &quot;domain&quot;: &quot;.facebook.com&quot;,
+        &quot;path&quot;: &quot;/&quot;,
+        &quot;expires&quot;: 1735689600.0,
+        &quot;httpOnly&quot;: false,
+        &quot;secure&quot;: true,
+        &quot;sameSite&quot;: &quot;None&quot;
+    },
+    ...
+]
+</code></pre>
+<p>Este formato es el mismo que acepta <code>context.add_cookies()</code> en <code>ContentFetcher.fetch()</code>, por lo que no requiere ninguna transformación.</p>
+<h3 id="inyeccion-en-el-navegador-durante-el-scraping">Inyección en el navegador durante el scraping</h3>
+<p>En <code>ContentFetcher.fetch()</code>:</p>
+<pre><code class="language-python">if cookies:
+    await context.add_cookies(cookies)
+    # Inyección en el contexto (no en la página): aplica a todas las
+    # páginas del contexto y persiste entre navegaciones.
+</code></pre>
+<p>La inyección se hace en el <strong>contexto</strong>, no en la página, lo que garantiza que las cookies estén disponibles desde la primera petición de red y evita cualquier redirect al muro de login.</p>
+<hr />
+<h2 id="8-integracion-con-el-pipeline-de-scraping">8. Integración con el pipeline de scraping</h2>
+<h3 id="basescraper_fetch_with_account"><code>BaseScraper._fetch_with_account()</code></h3>
+<p>Este método es el único punto de integración entre el sistema de cuentas y el pipeline de scraping:</p>
+<pre><code class="language-python">async def _fetch_with_account(self, platform: str, override_url: str | None = None):
+    manager = self.config.account_manager
+
+    if manager is None:
+        return await self._fetch(override_url=override_url)    # Modo anónimo
+
+    account = await manager.get_account_for_request(platform)
+    if account is None:
+        return await self._fetch(override_url=override_url)    # Pool vacío → anónimo
+
+    cookies = manager._local_storage.load_cookies(platform, account.account_id)
+    if not cookies:
+        return await self._fetch(override_url=override_url)    # Sin cookies → anónimo
+
+    self._active_account_id = account.account_id
+    fetch_result = await self._fetch(override_url=override_url, cookies=cookies)
+
+    if fetch_result.success:
+        await manager.record_success(account.account_id)
+    else:
+        await manager.record_failure(account.account_id, fetch_result.error or &quot;unknown&quot;)
+
+    return fetch_result
+</code></pre>
+<p>Los <strong>fetches secundarios</strong> (merge reel↔video, re-fetch de álbum) llaman a <code>_fetch()</code> directamente sin pasar por <code>_fetch_with_account()</code>. Estos son parte de la misma sesión y no deben cambiar de cuenta ni contar como peticiones independientes.</p>
+<h3 id="cambios-en-scraperconfig">Cambios en <code>ScraperConfig</code></h3>
+<pre><code class="language-python">@dataclass
+class ScraperConfig:
+    # ... campos existentes sin cambios ...
+
+    # Nuevo campo opcional — None por defecto
+    account_manager: Any = field(default=None, repr=False)
+
+    @property
+    def has_account_manager(self) -&gt; bool:
+        return self.account_manager is not None
+</code></pre>
+<h3 id="cambios-en-reaper">Cambios en <code>Reaper</code></h3>
+<pre><code class="language-python">class Reaper:
+    def __init__(self, account_manager: AccountManager | None = None) -&gt; None:
+        self._account_manager = account_manager
+
+    async def scrape(self, url, **kwargs) -&gt; dict:
+        config = ScraperConfig(
+            url=url,
+            account_manager=self._account_manager,
+            **kwargs,
+        )
+        ...
+</code></pre>
+<hr />
+<h2 id="9-ciclo-de-vida-de-una-cuenta">9. Ciclo de vida de una cuenta</h2>
+<pre><code>Registro inicial
+    add_account() → status=UNKNOWN (sin cookies)
+         ↓
+    import_cookies() / run_login_new_account()
+         ↓
+    status=ACTIVE, requests_since_refresh=0
+
+Uso normal
+    get_account_for_request() → seleccionada por rotador
+         ↓
+    record_success() × N
+         ↓ (cuando N &gt;= cookie_refresh_threshold)
+    status=NEEDS_REFRESH  ← WARNING en logs con comando de refresco
+         ↓
+    (operador llama run_login_refresh() o import_cookies())
+         ↓
+    status=ACTIVE, requests_since_refresh=0
+
+Fallo en cadena
+    record_failure() × CONSECUTIVE_FAILURES_FOR_RATE_LIMIT
+         ↓ (cuando failure_rate &gt; 80% en ventana reciente)
+    status=RATE_LIMITED  ← penalización ×0.2 en score
+         ↓
+    (operador puede forzar: update_status(id, ACTIVE))
+
+Suspensión
+    update_status(id, SUSPENDED)
+         ↓
+    is_selectable=False  ← excluida del rotador definitivamente
+         ↓
+    remove_account(id)  ← eliminar si ya no se va a rehabilitar
+</code></pre>
+<hr />
+<h2 id="10-migracion-a-base-de-datos">10. Migración a base de datos</h2>
+<p>Para migrar de almacenamiento local a una base de datos, implementa <code>BaseAccountStorage</code>:</p>
+<pre><code class="language-python"># my_app/storage.py
+from reaper.auth.storage.base import BaseAccountStorage, StorageError
+from reaper.auth.models import AccountActivity, AccountProfile
+from sqlalchemy.ext.asyncio import AsyncSession
+
+class PostgresAccountStorage(BaseAccountStorage):
+    def __init__(self, session: AsyncSession) -&gt; None:
+        self.session = session
+
+    async def save(self, account: AccountProfile) -&gt; None:
+        # INSERT ... ON CONFLICT DO UPDATE (upsert)
+        data = account.to_dict()
+        await self.session.execute(
+            &quot;INSERT INTO accounts ... ON CONFLICT (account_id) DO UPDATE SET ...&quot;,
+            data,
+        )
+        await self.session.commit()
+
+    async def load(self, account_id: str) -&gt; AccountProfile | None:
+        row = await self.session.execute(
+            &quot;SELECT * FROM accounts WHERE account_id = :id&quot;,
+            {&quot;id&quot;: account_id},
+        )
+        if not row:
+            return None
+        return AccountProfile.from_dict(dict(row))
+
+    async def delete(self, account_id: str) -&gt; bool:
+        result = await self.session.execute(
+            &quot;DELETE FROM accounts WHERE account_id = :id&quot;,
+            {&quot;id&quot;: account_id},
+        )
+        await self.session.commit()
+        return result.rowcount &gt; 0
+
+    async def list_all(self, platform: str | None = None) -&gt; list[AccountProfile]:
+        query = &quot;SELECT * FROM accounts&quot;
+        params = {}
+        if platform:
+            query += &quot; WHERE platform = :platform&quot;
+            params[&quot;platform&quot;] = platform
+        rows = await self.session.execute(query, params)
+        return [AccountProfile.from_dict(dict(r)) for r in rows]
+
+    async def update_activity(self, account_id: str, activity: AccountActivity) -&gt; bool:
+        # UPDATE solo el campo activity — más eficiente que save() completo
+        result = await self.session.execute(
+            &quot;UPDATE accounts SET activity = :activity, updated_at = NOW() &quot;
+            &quot;WHERE account_id = :id&quot;,
+            {&quot;activity&quot;: json.dumps(activity.to_dict()), &quot;id&quot;: account_id},
+        )
+        await self.session.commit()
+        return result.rowcount &gt; 0
+</code></pre>
+<p>Uso:</p>
+<pre><code class="language-python">from my_app.storage import PostgresAccountStorage
+
+storage = PostgresAccountStorage(session=async_session)
+manager = AccountManager(
+    storage=storage,
+    accounts_dir=&quot;data/accounts&quot;,   # aún necesario para cookies en disco
+    cookie_refresh_threshold=50,
+)
+</code></pre>
+<p><strong>Nota:</strong> Los archivos de cookies siempre se almacenan en disco local (<code>LocalFileStorage</code>), independientemente del backend de perfiles. El constructor de <code>AccountManager</code> siempre inicializa un <code>LocalFileStorage</code> para gestionar el acceso físico a los archivos de cookies.</p>
+<hr />
+<h2 id="11-referencia-de-constantes">11. Referencia de constantes</h2>
+<h3 id="reaperauthmodelspy"><code>reaper/auth/models.py</code></h3>
+<table>
+<thead>
+<tr>
+<th>Constante</th>
+<th>Valor</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MAX_RECENT_ERRORS</code></td>
+<td><code>20</code></td>
+<td>Entradas máximas en <code>recent_errors</code> (FIFO)</td>
+</tr>
+<tr>
+<td><code>SUPPORTED_PLATFORMS</code></td>
+<td><code>{"facebook", "instagram"}</code></td>
+<td>Plataformas válidas para <code>AccountProfile.platform</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="reaperauthrotatorpy"><code>reaper/auth/rotator.py</code></h3>
+<table>
+<thead>
+<tr>
+<th>Constante</th>
+<th>Valor</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WEIGHT_SUCCESS_RATE</code></td>
+<td><code>0.6</code></td>
+<td>Peso de la tasa de éxito en el score</td>
+</tr>
+<tr>
+<td><code>WEIGHT_LEAST_RECENTLY_USED</code></td>
+<td><code>0.3</code></td>
+<td>Peso de la antigüedad de uso</td>
+</tr>
+<tr>
+<td><code>WEIGHT_COOKIE_AGE</code></td>
+<td><code>0.1</code></td>
+<td>Peso negativo de la antigüedad de cookies</td>
+</tr>
+<tr>
+<td><code>RATE_LIMITED_PENALTY</code></td>
+<td><code>0.2</code></td>
+<td>Multiplicador de penalización para <code>RATE_LIMITED</code></td>
+</tr>
+<tr>
+<td><code>NEEDS_REFRESH_PENALTY</code></td>
+<td><code>0.5</code></td>
+<td>Multiplicador de penalización para <code>NEEDS_REFRESH</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="reaperauthaccount_managerpy"><code>reaper/auth/account_manager.py</code></h3>
+<table>
+<thead>
+<tr>
+<th>Constante</th>
+<th>Valor</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DEFAULT_COOKIE_REFRESH_THRESHOLD</code></td>
+<td><code>50</code></td>
+<td>Peticiones exitosas antes de <code>NEEDS_REFRESH</code></td>
+</tr>
+<tr>
+<td><code>CONSECUTIVE_FAILURES_FOR_RATE_LIMIT</code></td>
+<td><code>5</code></td>
+<td>Fallos consecutivos antes de <code>RATE_LIMITED</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="reaperauthloginpy"><code>reaper/auth/login.py</code></h3>
+<table>
+<thead>
+<tr>
+<th>Constante</th>
+<th>Valor</th>
+<th>Descripción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LOGIN_TIMEOUT_SECONDS</code></td>
+<td><code>300</code></td>
+<td>Tiempo máximo de espera del login (segundos)</td>
+</tr>
+<tr>
+<td><code>URL_POLL_INTERVAL</code></td>
+<td><code>1.0</code></td>
+<td>Segundos entre comprobaciones de URL</td>
+</tr>
+<tr>
+<td><code>PROGRESS_REPORT_INTERVAL</code></td>
+<td><code>30</code></td>
+<td>Segundos entre mensajes de progreso al usuario</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="12-diagramas-de-flujo">12. Diagramas de flujo</h2>
+<h3 id="seleccion-de-cuenta-en-_fetch_with_account">Selección de cuenta en <code>_fetch_with_account()</code></h3>
+<pre><code>_fetch_with_account(&quot;facebook&quot;)
+         │
+         ▼
+  account_manager is None?
+    ├─ SÍ → _fetch() anónimo ──────────────────────────────────► return
+    └─ NO ↓
+         │
+  get_account_for_request(&quot;facebook&quot;)
+         │
+  ¿Ninguna cuenta disponible?
+    ├─ SÍ → WARNING + _fetch() anónimo ────────────────────────► return
+    └─ NO ↓
+         │
+  load_cookies(platform, account_id)
+         │
+  ¿Cookies en disco?
+    ├─ NO → WARNING + _fetch() anónimo ────────────────────────► return
+    └─ SÍ ↓
+         │
+  _fetch(cookies=cookies)   ← Playwright con sesión autenticada
+         │
+  fetch.success?
+    ├─ SÍ → record_success(account_id)
+    └─ NO → record_failure(account_id, error)
+         │
+         ▼
+       return fetch_result
+</code></pre>
+<h3 id="ciclo-de-refresco-automatico">Ciclo de refresco automático</h3>
+<pre><code>record_success(account_id)
+         │
+  requests_since_refresh &gt;= threshold?
+    ├─ NO → update_activity() → fin
+    └─ SÍ ↓
+         │
+  status == ACTIVE?
+    ├─ NO → update_activity() → fin
+    └─ SÍ ↓
+         │
+  status = NEEDS_REFRESH
+  touch_updated()
+  WARNING en logs: &quot;Importa cookies frescas con import_cookies(id, cookies)&quot;
+  save(profile)
+  update_activity()
+         │
+         ▼
+        fin
+</code></pre>
+<hr />
+<h2 id="13-testing-del-modulo">13. Testing del módulo</h2>
+<h3 id="tests-unitarios-incluidos-ejecutados-durante-el-desarrollo">Tests unitarios incluidos (ejecutados durante el desarrollo)</h3>
+<p>El módulo fue validado con 14 tests de integración que cubren:</p>
+<ul>
+<li><code>add_account</code> sin cookies → <code>status=UNKNOWN</code></li>
+<li><code>import_cookies</code> → <code>status=ACTIVE</code>, cookies en disco, contador=0</li>
+<li><code>get_account_for_request</code> con pool de 1 cuenta</li>
+<li><code>record_success</code> × threshold → <code>NEEDS_REFRESH</code></li>
+<li><code>NEEDS_REFRESH</code> sigue seleccionable (score penalizado)</li>
+<li><code>import_cookies</code> resetea estado → <code>ACTIVE</code>, contador=0</li>
+<li><code>record_failure</code> con alta tasa de fallos → <code>RATE_LIMITED</code></li>
+<li><code>RATE_LIMITED</code> sigue seleccionable (score muy penalizado)</li>
+<li><code>SUSPENDED</code> bloquea selección → <code>None</code></li>
+<li><code>pool_summary</code> con estado correcto</li>
+<li>Ranking de 2 cuentas: la menos usada tiene mayor score</li>
+<li><code>list_accounts</code> con filtro por plataforma</li>
+<li><code>remove_account</code> existente y no existente</li>
+<li><code>export_cookies</code> devuelve la lista original</li>
+</ul>
+<h3 id="como-anadir-tests">Cómo añadir tests</h3>
+<pre><code class="language-python"># tests/test_account_manager.py
+import asyncio
+import pytest
+from pathlib import Path
+from reaper.auth import AccountManager, AccountStatus
+
+@pytest.fixture
+def tmp_manager(tmp_path):
+    return AccountManager(accounts_dir=tmp_path / &quot;accounts&quot;, cookie_refresh_threshold=5)
+
+@pytest.mark.asyncio
+async def test_add_account_creates_profile(tmp_manager):
+    profile = await tmp_manager.add_account(platform=&quot;facebook&quot;, username=&quot;test&quot;)
+    assert profile.account_id
+    assert profile.status == AccountStatus.UNKNOWN
+
+@pytest.mark.asyncio
+async def test_import_cookies_activates_account(tmp_manager):
+    profile = await tmp_manager.add_account(platform=&quot;facebook&quot;, username=&quot;test&quot;)
+    cookies = [{&quot;name&quot;: &quot;c_user&quot;, &quot;value&quot;: &quot;123&quot;, &quot;domain&quot;: &quot;.facebook.com&quot;,
+                &quot;path&quot;: &quot;/&quot;, &quot;expires&quot;: 9999.0, &quot;httpOnly&quot;: False,
+                &quot;secure&quot;: True, &quot;sameSite&quot;: &quot;None&quot;}]
+    await tmp_manager.import_cookies(profile.account_id, cookies)
+    reloaded = await tmp_manager.get_account(profile.account_id)
+    assert reloaded.status == AccountStatus.ACTIVE
+    assert reloaded.has_cookies is True
+</code></pre>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "toc.integrate", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

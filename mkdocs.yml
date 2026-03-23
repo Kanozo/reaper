@@ -1,0 +1,29 @@
+site_name: Reaper
+site_description: Librería Python para scraping de Facebook e Instagram
+docs_dir: docs
+site_dir: docs_build
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+
+nav:
+  - Inicio: index.md
+  - Manual de Usuario:
+      - Cuentas Autenticadas: user/auth.md
+  - Referencia Técnica:
+      - Arquitectura General: technical/reference.md
+      - Módulo Auth: technical/auth.md

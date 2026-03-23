@@ -1,0 +1,1587 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Librería Python para scraping de Facebook e Instagram">
+      
+      
+      
+      
+        <link rel="prev" href="../..">
+      
+      
+        <link rel="next" href="../../technical/reference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Cuentas Autenticadas - Reaper</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#reaper-manual-de-usuario-cuentas-autenticadas" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Reaper" class="md-header__button md-logo" aria-label="Reaper" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Reaper
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Cuentas Autenticadas
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Inicio
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Manual de Usuario
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../technical/reference/" class="md-tabs__link">
+          
+  
+  
+  Referencia Técnica
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Reaper" class="md-nav__button md-logo" aria-label="Reaper" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Reaper
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual de Usuario
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Manual de Usuario
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cuentas Autenticadas
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cuentas Autenticadas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tabla-de-contenidos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tabla de Contenidos
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-para-que-sirven-las-cuentas-autenticadas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. ¿Para qué sirven las cuentas autenticadas?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-instalacion-y-requisitos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Instalación y requisitos
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-primeros-pasos-anadir-tu-primera-cuenta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Primeros pasos: añadir tu primera cuenta
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Primeros pasos: añadir tu primera cuenta">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#opcion-a-desde-python-recomendado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opción A: desde Python (recomendado)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#opcion-b-desde-la-linea-de-comandos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Opción B: desde la línea de comandos
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#donde-se-guardan-las-cookies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ¿Dónde se guardan las cookies?
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-uso-con-la-funcion-scrape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Uso con la función scrape()
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Uso con la función scrape()">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scraping-de-multiples-urls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scraping de múltiples URLs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sin-cuentas-modo-anonimo-igual-que-antes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sin cuentas: modo anónimo (igual que antes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-gestionar-multiples-cuentas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Gestionar múltiples cuentas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Gestionar múltiples cuentas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#anadir-mas-cuentas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Añadir más cuentas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ver-todas-tus-cuentas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ver todas tus cuentas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#eliminar-una-cuenta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Eliminar una cuenta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ver-el-ranking-de-cuentas-como-las-puntua-el-sistema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ver el ranking de cuentas (cómo las puntúa el sistema)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-refrescar-cookies-de-una-cuenta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Refrescar cookies de una cuenta
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Refrescar cookies de una cuenta">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cuando-refrescar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ¿Cuándo refrescar?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#como-refrescar" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cómo refrescar
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#importar-cookies-desde-un-archivo-externo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Importar cookies desde un archivo externo
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-monitorear-el-estado-del-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Monitorear el estado del pool
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Monitorear el estado del pool">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#resumen-rapido-del-pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resumen rápido del pool
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ver-el-historial-de-errores-de-una-cuenta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ver el historial de errores de una cuenta
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#marcar-manualmente-el-estado-de-una-cuenta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Marcar manualmente el estado de una cuenta
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-entendiendo-los-estados-de-las-cuentas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Entendiendo los estados de las cuentas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-uso-desde-la-linea-de-comandos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Uso desde la línea de comandos
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Uso desde la línea de comandos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#login-y-registro-de-cuenta-nueva" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Login y registro de cuenta nueva
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refresco-de-cookies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refresco de cookies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#codigos-de-salida-del-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Códigos de salida del CLI
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-preguntas-frecuentes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Preguntas frecuentes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-resolucion-de-problemas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Resolución de problemas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Resolución de problemas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#el-navegador-se-abre-pero-no-detecta-que-inicie-sesion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        El navegador se abre pero no detecta que inicié sesión
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#statuscookie_expired-aunque-acabo-de-hacer-login" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        status=cookie_expired aunque acabo de hacer login
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#statusrate_limited-la-cuenta-no-se-usa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        status=rate_limited — la cuenta no se usa
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get_account_for_request-devuelve-none-teniendo-cuentas-registradas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_account_for_request() devuelve None teniendo cuentas registradas
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#las-cookies-no-se-guardan-has_cookiesfalse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Las cookies no se guardan (has_cookies=False)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ver-los-logs-detallados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ver los logs detallados
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referencia Técnica
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Referencia Técnica
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitectura General
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../technical/auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Módulo Auth
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="reaper-manual-de-usuario-cuentas-autenticadas">Reaper — Manual de Usuario: Cuentas Autenticadas</h1>
+<blockquote>
+<p><strong>Versión</strong>: 0.2.0 | Módulo: Gestión de cuentas con sesión</p>
+</blockquote>
+<hr />
+<h2 id="tabla-de-contenidos">Tabla de Contenidos</h2>
+<ol>
+<li><a href="#1-para-qué-sirven-las-cuentas-autenticadas">¿Para qué sirven las cuentas autenticadas?</a></li>
+<li><a href="#2-instalación-y-requisitos">Instalación y requisitos</a></li>
+<li><a href="#3-primeros-pasos-añadir-tu-primera-cuenta">Primeros pasos: añadir tu primera cuenta</a></li>
+<li><a href="#4-uso-con-la-función-scrape">Uso con la función <code>scrape()</code></a></li>
+<li><a href="#5-gestionar-múltiples-cuentas">Gestionar múltiples cuentas</a></li>
+<li><a href="#6-refrescar-cookies-de-una-cuenta">Refrescar cookies de una cuenta</a></li>
+<li><a href="#7-monitorear-el-estado-del-pool">Monitorear el estado del pool</a></li>
+<li><a href="#8-entendiendo-los-estados-de-las-cuentas">Entendiendo los estados de las cuentas</a></li>
+<li><a href="#9-uso-desde-la-línea-de-comandos">Uso desde la línea de comandos</a></li>
+<li><a href="#10-preguntas-frecuentes">Preguntas frecuentes</a></li>
+<li><a href="#11-resolución-de-problemas">Resolución de problemas</a></li>
+</ol>
+<hr />
+<h2 id="1-para-que-sirven-las-cuentas-autenticadas">1. ¿Para qué sirven las cuentas autenticadas?</h2>
+<p>Reaper siempre ha podido extraer contenido <strong>público</strong> de Facebook e Instagram sin necesitar credenciales. Esta nueva funcionalidad añade soporte para <strong>sesiones autenticadas</strong>: puedes registrar tus propias cuentas de Facebook o Instagram y Reaper las usará al hacer las peticiones.</p>
+<p><strong>¿Cuándo tiene sentido usarlas?</strong></p>
+<ul>
+<li>Cuando quieras acceder a contenido que requiere estar logueado para verlo en el feed.</li>
+<li>Cuando hagas muchas peticiones seguidas y quieras distribuirlas entre varias cuentas para evitar que una sola acumule demasiada actividad.</li>
+<li>Cuando quieras un registro detallado de qué cuenta realizó cada petición y su historial de éxitos y fallos.</li>
+</ul>
+<p><strong>¿Qué NO hacen?</strong></p>
+<ul>
+<li>No acceden a contenido privado de otros usuarios (mensajes, perfiles privados).</li>
+<li>No hacen login automatizado: tú siempre introduces las credenciales manualmente en el navegador.</li>
+<li>No evitan bloqueos o bans si usas las cuentas de forma agresiva.</li>
+</ul>
+<hr />
+<h2 id="2-instalacion-y-requisitos">2. Instalación y requisitos</h2>
+<p>No se requieren dependencias adicionales. Firefox y Playwright ya son parte de Reaper.</p>
+<p>Si todavía no has instalado Reaper:</p>
+<pre><code class="language-bash">pip install -e .
+playwright install firefox
+</code></pre>
+<p>Verifica que todo funciona:</p>
+<pre><code class="language-python">from reaper import AccountManager
+print(&quot;OK&quot;)
+</code></pre>
+<hr />
+<h2 id="3-primeros-pasos-anadir-tu-primera-cuenta">3. Primeros pasos: añadir tu primera cuenta</h2>
+<p>El proceso tiene dos pasos:</p>
+<ol>
+<li>Ejecutar el flujo de login — se abre Firefox para que inicies sesión manualmente.</li>
+<li>Las cookies de sesión se guardan automáticamente — Reaper las usará en el futuro.</li>
+</ol>
+<h3 id="opcion-a-desde-python-recomendado">Opción A: desde Python (recomendado)</h3>
+<pre><code class="language-python">import asyncio
+from reaper import AccountManager
+from reaper.auth.login import run_login_new_account
+
+async def main():
+    # El AccountManager guarda todo en data/accounts/ por defecto
+    manager = AccountManager()
+
+    # Esto abre Firefox y espera a que inicies sesión manualmente
+    cuenta = await run_login_new_account(
+        manager=manager,
+        platform=&quot;facebook&quot;,           # o &quot;instagram&quot;
+        username=&quot;mi_usuario@gmail.com&quot;,
+    )
+
+    if cuenta:
+        print(f&quot;Cuenta registrada con éxito.&quot;)
+        print(f&quot;ID: {cuenta.account_id}&quot;)
+        print(f&quot;Estado: {cuenta.status.value}&quot;)
+    else:
+        print(&quot;El login no se completó.&quot;)
+
+asyncio.run(main())
+</code></pre>
+<p>Cuando ejecutes este código:
+1. Se abrirá una ventana de Firefox con la página de login de Facebook.
+2. Introduce tus credenciales, completa el 2FA si lo tienes activado.
+3. Una vez que el navegador te lleve al feed principal, el script lo detecta, guarda las cookies y cierra el navegador automáticamente.
+4. No cierres el navegador tú mismo — espera a que el script lo haga.</p>
+<h3 id="opcion-b-desde-la-linea-de-comandos">Opción B: desde la línea de comandos</h3>
+<pre><code class="language-bash"># Modo interactivo (hace preguntas)
+python -m reaper.auth.login
+
+# Especificando plataforma y usuario
+python -m reaper.auth.login --platform facebook --username mi_usuario@gmail.com
+
+# Para Instagram
+python -m reaper.auth.login --platform instagram --username mi_usuario_ig
+</code></pre>
+<h3 id="donde-se-guardan-las-cookies">¿Dónde se guardan las cookies?</h3>
+<p>Por defecto en <code>data/accounts/</code>, con esta estructura:</p>
+<pre><code>data/accounts/
+└── facebook/
+    └── 3f2e1a-[uuid]/
+        ├── account.json   ← información de la cuenta (sin contraseñas)
+        └── cookies.json   ← cookies de sesión
+</code></pre>
+<p>Puedes cambiar esta ubicación:</p>
+<pre><code class="language-python">manager = AccountManager(accounts_dir=&quot;/ruta/personalizada/cuentas&quot;)
+</code></pre>
+<hr />
+<h2 id="4-uso-con-la-funcion-scrape">4. Uso con la función <code>scrape()</code></h2>
+<p>Una vez que tienes cuentas registradas, simplemente pasa el <code>AccountManager</code> al hacer el scraping:</p>
+<pre><code class="language-python">import asyncio
+from reaper import scrape, AccountManager
+
+async def main():
+    manager = AccountManager()   # carga las cuentas guardadas en data/accounts/
+
+    resultado = await scrape(
+        url=&quot;https://www.facebook.com/reel/123456&quot;,
+        account_manager=manager,
+    )
+    print(resultado[&quot;author&quot;][&quot;name&quot;])
+    print(resultado[&quot;text&quot;])
+
+asyncio.run(main())
+</code></pre>
+<p><strong>Reaper selecciona automáticamente la mejor cuenta disponible.</strong> No necesitas indicar cuál usar; el sistema evalúa el historial de cada cuenta y elige la más adecuada.</p>
+<h3 id="scraping-de-multiples-urls">Scraping de múltiples URLs</h3>
+<p>Cuando usas la clase <code>Reaper</code> directamente, el mismo <code>AccountManager</code> se reutiliza entre peticiones y el historial de actividad se acumula correctamente:</p>
+<pre><code class="language-python">import asyncio
+from reaper import Reaper, AccountManager
+
+async def main():
+    manager = AccountManager()
+    reaper  = Reaper(account_manager=manager)
+
+    urls = [
+        &quot;https://www.facebook.com/reel/111111&quot;,
+        &quot;https://www.instagram.com/p/abc123/&quot;,
+        &quot;https://www.facebook.com/reel/222222&quot;,
+        &quot;https://www.instagram.com/reel/def456/&quot;,
+    ]
+
+    resultados = []
+    for url in urls:
+        resultado = await reaper.scrape(url)
+        if resultado.get(&quot;raw_data_available&quot;):
+            resultados.append(resultado)
+            print(f&quot;OK: {url}&quot;)
+        else:
+            print(f&quot;Sin datos: {url} — {resultado.get('error')}&quot;)
+
+    print(f&quot;\nExtraídos: {len(resultados)}/{len(urls)}&quot;)
+
+asyncio.run(main())
+</code></pre>
+<h3 id="sin-cuentas-modo-anonimo-igual-que-antes">Sin cuentas: modo anónimo (igual que antes)</h3>
+<p>Si no pasas <code>account_manager</code>, Reaper funciona exactamente igual que en la versión 0.1.x:</p>
+<pre><code class="language-python"># Sin cuentas — funciona igual que antes
+resultado = await scrape(&quot;https://www.facebook.com/reel/123456&quot;)
+</code></pre>
+<hr />
+<h2 id="5-gestionar-multiples-cuentas">5. Gestionar múltiples cuentas</h2>
+<p>Puedes registrar tantas cuentas como necesites, tanto de Facebook como de Instagram.</p>
+<h3 id="anadir-mas-cuentas">Añadir más cuentas</h3>
+<pre><code class="language-python">import asyncio
+from reaper import AccountManager
+from reaper.auth.login import run_login_new_account
+
+async def main():
+    manager = AccountManager()
+
+    # Segunda cuenta de Facebook
+    await run_login_new_account(manager, &quot;facebook&quot;, &quot;otra_cuenta@gmail.com&quot;)
+
+    # Cuenta de Instagram
+    await run_login_new_account(manager, &quot;instagram&quot;, &quot;mi_ig_profesional&quot;)
+
+asyncio.run(main())
+</code></pre>
+<h3 id="ver-todas-tus-cuentas">Ver todas tus cuentas</h3>
+<pre><code class="language-python">import asyncio
+from reaper import AccountManager
+
+async def main():
+    manager = AccountManager()
+
+    # Todas las cuentas
+    todas = await manager.list_accounts()
+    for cuenta in todas:
+        print(f&quot;[{cuenta.platform:10s}] {cuenta.username:30s} | estado={cuenta.status.value}&quot;)
+
+    # Solo Facebook
+    fb = await manager.list_accounts(&quot;facebook&quot;)
+    print(f&quot;\nCuentas de Facebook: {len(fb)}&quot;)
+
+    # Solo Instagram
+    ig = await manager.list_accounts(&quot;instagram&quot;)
+    print(f&quot;Cuentas de Instagram: {len(ig)}&quot;)
+
+asyncio.run(main())
+</code></pre>
+<h3 id="eliminar-una-cuenta">Eliminar una cuenta</h3>
+<pre><code class="language-python">async def main():
+    manager = AccountManager()
+
+    # Primero, ver las cuentas para obtener el account_id
+    cuentas = await manager.list_accounts()
+    for c in cuentas:
+        print(f&quot;{c.account_id[:8]}...  {c.username}&quot;)
+
+    # Eliminar (borra el perfil y las cookies del disco)
+    eliminada = await manager.remove_account(&quot;account_id_completo_aqui&quot;)
+    print(&quot;Eliminada:&quot; if eliminada else &quot;No se encontró esa cuenta&quot;)
+
+asyncio.run(main())
+</code></pre>
+<h3 id="ver-el-ranking-de-cuentas-como-las-puntua-el-sistema">Ver el ranking de cuentas (cómo las puntúa el sistema)</h3>
+<pre><code class="language-python">async def main():
+    manager = AccountManager()
+
+    ranking = await manager.get_ranked_accounts(&quot;facebook&quot;)
+    print(f&quot;{'#':&gt;3}  {'Usuario':30}  {'Score':&gt;6}  {'Éxitos':&gt;7}  {'Peticiones':&gt;10}  Estado&quot;)
+    print(&quot;-&quot; * 75)
+    for r in ranking:
+        print(
+            f&quot;{r['rank']:&gt;3}. {r['username']:30}  &quot;
+            f&quot;{r['score']:&gt;6.3f}  {r['success_rate']:&gt;6.0%}  &quot;
+            f&quot;{r['total_requests']:&gt;10}  {r['status']}&quot;
+        )
+
+asyncio.run(main())
+</code></pre>
+<p>Ejemplo de salida:</p>
+<pre><code>  #  Usuario                         Score  Éxitos  Peticiones  Estado
+---------------------------------------------------------------------------
+  1. cuenta_nueva                    0.900   100%           0  unknown
+  2. cuenta_activa_fb                0.612    95%          47  active
+  3. cuenta_vieja                    0.301    72%         124  needs_refresh
+  4. cuenta_con_problemas            0.115    60%          31  rate_limited
+</code></pre>
+<hr />
+<h2 id="6-refrescar-cookies-de-una-cuenta">6. Refrescar cookies de una cuenta</h2>
+<p>Las cookies de sesión tienen una vida útil limitada. Reaper hace un seguimiento del número de peticiones realizadas con cada sesión y te avisa cuando es momento de refrescarlas.</p>
+<h3 id="cuando-refrescar">¿Cuándo refrescar?</h3>
+<p>Verás este aviso en los logs cuando una cuenta necesite refresco:</p>
+<pre><code>WARNING  Umbral de refresco alcanzado | username=mi_usuario | peticiones_desde_refresco=50
+         — Importa cookies frescas con account_manager.import_cookies('3f2e1a-...', new_cookies)
+</code></pre>
+<p>Por defecto el umbral es <strong>50 peticiones exitosas</strong>. Puedes ajustarlo:</p>
+<pre><code class="language-python">manager = AccountManager(cookie_refresh_threshold=100)  # refresca cada 100 peticiones
+</code></pre>
+<h3 id="como-refrescar">Cómo refrescar</h3>
+<p><strong>Opción A: desde Python</strong></p>
+<pre><code class="language-python">import asyncio
+from reaper import AccountManager
+from reaper.auth.login import run_login_refresh
+
+async def main():
+    manager = AccountManager()
+
+    # Ver las cuentas que necesitan refresco
+    cuentas = await manager.list_accounts()
+    necesitan_refresco = [c for c in cuentas if c.status.value in (&quot;needs_refresh&quot;, &quot;cookie_expired&quot;)]
+
+    for cuenta in necesitan_refresco:
+        print(f&quot;Refrescando: {cuenta.username} ({cuenta.platform})...&quot;)
+        ok = await run_login_refresh(manager, cuenta.account_id)
+        if ok:
+            print(f&quot;  OK — Cookies actualizadas.&quot;)
+        else:
+            print(f&quot;  Error — Refresco no completado.&quot;)
+
+asyncio.run(main())
+</code></pre>
+<p><strong>Opción B: desde la línea de comandos</strong></p>
+<pre><code class="language-bash"># Modo interactivo — muestra las cuentas disponibles y pregunta cuál refrescar
+python -m reaper.auth.login --refresh
+
+# Especificando el account_id directamente
+python -m reaper.auth.login --refresh --account-id 3f2e1a-uuid-completo
+</code></pre>
+<p>Cuando ejecutes el refresco:
+1. Se abrirá Firefox con la página de login.
+2. Introduce tus credenciales (o si el navegador recuerda la sesión, puede que ya estés logueado).
+3. Una vez en el feed, el script captura las cookies nuevas, reemplaza las antiguas y cierra el navegador.
+4. El estado de la cuenta vuelve a <code>active</code> y el contador se resetea a 0.</p>
+<h3 id="importar-cookies-desde-un-archivo-externo">Importar cookies desde un archivo externo</h3>
+<p>Si exportaste las cookies manualmente desde tu navegador con una extensión como Cookie-Editor:</p>
+<pre><code class="language-python">async def main():
+    manager = AccountManager()
+    cuentas = await manager.list_accounts(&quot;facebook&quot;)
+    cuenta = cuentas[0]  # la primera cuenta de Facebook
+
+    # Importar desde archivo JSON externo
+    ok = await manager.import_cookies_from_file(
+        account_id=cuenta.account_id,
+        cookies_file=&quot;mis_cookies_exportadas.json&quot;,
+    )
+    print(&quot;Importadas correctamente&quot; if ok else &quot;Error al importar&quot;)
+
+asyncio.run(main())
+</code></pre>
+<hr />
+<h2 id="7-monitorear-el-estado-del-pool">7. Monitorear el estado del pool</h2>
+<h3 id="resumen-rapido-del-pool">Resumen rápido del pool</h3>
+<pre><code class="language-python">async def main():
+    manager = AccountManager()
+
+    resumen = await manager.pool_summary()
+    print(f&quot;Total de cuentas  : {resumen['total']}&quot;)
+    print(f&quot;Activas           : {resumen['active']}&quot;)
+    print(f&quot;Necesitan refresco: {resumen['needs_refresh']}&quot;)
+    print(f&quot;Con rate-limit    : {resumen['rate_limited']}&quot;)
+    print(f&quot;Suspendidas       : {resumen['suspended']}&quot;)
+    print(f&quot;Expiradas         : {resumen['cookie_expired']}&quot;)
+
+asyncio.run(main())
+</code></pre>
+<p>Salida de ejemplo:</p>
+<pre><code>Total de cuentas  : 5
+Activas           : 3
+Necesitan refresco: 1
+Con rate-limit    : 1
+Suspendidas       : 0
+Expiradas         : 0
+</code></pre>
+<h3 id="ver-el-historial-de-errores-de-una-cuenta">Ver el historial de errores de una cuenta</h3>
+<pre><code class="language-python">async def main():
+    manager = AccountManager()
+    cuentas = await manager.list_accounts()
+
+    for cuenta in cuentas:
+        if cuenta.activity.recent_errors:
+            print(f&quot;\n{cuenta.username} — últimos errores:&quot;)
+            for error in cuenta.activity.recent_errors[:5]:
+                print(f&quot;  {error}&quot;)
+
+asyncio.run(main())
+</code></pre>
+<h3 id="marcar-manualmente-el-estado-de-una-cuenta">Marcar manualmente el estado de una cuenta</h3>
+<pre><code class="language-python">from reaper import AccountManager, AccountStatus
+
+async def main():
+    manager = AccountManager()
+
+    # Reactivar una cuenta suspendida (cuando ya sabes que está bien)
+    await manager.update_status(
+        account_id=&quot;3f2e1a-uuid...&quot;,
+        status=AccountStatus.ACTIVE,
+        notes=&quot;Reactivada manualmente — verificada el 2026-01-15&quot;,
+    )
+
+    # Marcar como suspendida una cuenta que ya no funciona
+    await manager.update_status(
+        account_id=&quot;otro-uuid...&quot;,
+        status=AccountStatus.SUSPENDED,
+        notes=&quot;Cuenta bloqueada por la plataforma&quot;,
+    )
+
+asyncio.run(main())
+</code></pre>
+<hr />
+<h2 id="8-entendiendo-los-estados-de-las-cuentas">8. Entendiendo los estados de las cuentas</h2>
+<table>
+<thead>
+<tr>
+<th>Estado</th>
+<th>Significado</th>
+<th>¿Se usa en peticiones?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>active</code></td>
+<td>La cuenta está operativa y sus cookies son válidas.</td>
+<td>Sí, con prioridad normal</td>
+</tr>
+<tr>
+<td><code>needs_refresh</code></td>
+<td>Se alcanzó el umbral de peticiones. Sigue funcionando pero las cookies son viejas.</td>
+<td>Sí, con prioridad reducida</td>
+</tr>
+<tr>
+<td><code>rate_limited</code></td>
+<td>La plataforma devolvió señales de throttling o muchos errores seguidos.</td>
+<td>Sí, con prioridad muy reducida</td>
+</tr>
+<tr>
+<td><code>cookie_expired</code></td>
+<td>Las cookies ya no son válidas (sesión cerrada o expirada).</td>
+<td>No — requiere refresco</td>
+</tr>
+<tr>
+<td><code>suspended</code></td>
+<td>La cuenta fue suspendida.</td>
+<td>No — requiere intervención manual</td>
+</tr>
+<tr>
+<td><code>unknown</code></td>
+<td>Estado inicial. La cuenta no tiene cookies todavía.</td>
+<td>No — requiere importar cookies</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Flujo normal de una cuenta:</strong></p>
+<pre><code>unknown → (importar cookies) → active → (50 peticiones) → needs_refresh
+                                                              ↓
+                                                   (refrescar login)
+                                                              ↓
+                                                           active
+</code></pre>
+<p><strong>Si hay muchos errores seguidos:</strong></p>
+<pre><code>active → (5+ fallos consecutivos con &gt;80% tasa de fallo) → rate_limited
+rate_limited → (update_status manual o run_login_refresh) → active
+</code></pre>
+<hr />
+<h2 id="9-uso-desde-la-linea-de-comandos">9. Uso desde la línea de comandos</h2>
+<h3 id="login-y-registro-de-cuenta-nueva">Login y registro de cuenta nueva</h3>
+<pre><code class="language-bash"># Modo interactivo (hace preguntas en la terminal)
+python -m reaper.auth.login
+
+# Especificando todos los parámetros
+python -m reaper.auth.login --platform facebook --username usuario@gmail.com
+
+# Con directorio personalizado
+python -m reaper.auth.login --platform instagram --username mi_usuario \
+    --accounts-dir /datos/mis_cuentas
+
+# Umbral de refresco personalizado
+python -m reaper.auth.login --platform facebook --username usuario@gmail.com \
+    --threshold 100
+</code></pre>
+<h3 id="refresco-de-cookies">Refresco de cookies</h3>
+<pre><code class="language-bash"># Modo interactivo — muestra lista de cuentas y pregunta cuál refrescar
+python -m reaper.auth.login --refresh
+
+# Especificando el account_id
+python -m reaper.auth.login --refresh \
+    --account-id 3f2e1a-0000-0000-0000-000000000000
+</code></pre>
+<h3 id="codigos-de-salida-del-cli">Códigos de salida del CLI</h3>
+<table>
+<thead>
+<tr>
+<th>Código</th>
+<th>Significado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>Éxito — login completado y cookies guardadas</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>Error — login no completado, plataforma inválida, o cuenta no encontrada</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="10-preguntas-frecuentes">10. Preguntas frecuentes</h2>
+<p><strong>¿Mis credenciales se guardan en algún lado?</strong>
+No. Reaper nunca almacena tu contraseña ni tu email. Solo guarda las cookies de sesión que el navegador genera después de que tú inicias sesión manualmente. Las contraseñas nunca pasan por el código de Reaper.</p>
+<p><strong>¿Cuántas cuentas puedo registrar?</strong>
+Sin límite técnico. Puedes registrar todas las cuentas que necesites de Facebook y/o Instagram.</p>
+<p><strong>¿Cómo decide Reaper qué cuenta usar?</strong>
+Evalúa cada cuenta con un score basado en tres factores: su tasa de éxito histórica (peso 60%), cuánto tiempo lleva sin usarse — favorece las menos recientes (peso 30%), y cuántas peticiones lleva desde el último refresco de cookies (peso 10%). La cuenta con el score más alto se selecciona.</p>
+<p><strong>¿Qué pasa si no tengo cuentas registradas?</strong>
+Reaper funciona en modo anónimo exactamente igual que en la versión anterior. No registrar cuentas no rompe nada.</p>
+<p><strong>¿El sistema cambia de cuenta en cada petición?</strong>
+Sí, selecciona la mejor cuenta disponible en cada petición. Con varias cuentas activas la carga se distribuye automáticamente favoreciendo las menos usadas recientemente.</p>
+<p><strong>¿Puedo usar cuentas solo para Facebook y modo anónimo para Instagram?</strong>
+Sí. El rotador filtra por plataforma. Si tienes cuentas de Facebook pero no de Instagram, Reaper usará las cuentas para peticiones de Facebook y modo anónimo para Instagram.</p>
+<p><strong>¿El umbral de refresco me desconecta de las cuentas?</strong>
+No. Cuando se alcanza el umbral la cuenta pasa a estado <code>needs_refresh</code> pero sigue siendo utilizable (con prioridad reducida). Solo deja de funcionar si las cookies realmente expiran (<code>cookie_expired</code>), algo que la plataforma controla independientemente del umbral.</p>
+<p><strong>¿Qué formato tienen las cookies exportadas?</strong>
+Formato Playwright, que es idéntico al formato Netscape/JSON estándar que exportan extensiones como Cookie-Editor. Es una lista JSON de objetos con campos <code>name</code>, <code>value</code>, <code>domain</code>, <code>path</code>, <code>expires</code>, <code>httpOnly</code>, <code>secure</code> y <code>sameSite</code>.</p>
+<hr />
+<h2 id="11-resolucion-de-problemas">11. Resolución de problemas</h2>
+<h3 id="el-navegador-se-abre-pero-no-detecta-que-inicie-sesion">El navegador se abre pero no detecta que inicié sesión</h3>
+<p>Verifica que la URL tras el login contiene uno de los patrones esperados. Para Facebook debe contener <code>facebook.com/?</code> o <code>facebook.com/feed</code>. Para Instagram, <code>instagram.com/?</code>.</p>
+<p>Si usas una cuenta en otro idioma, el feed puede tener una URL diferente. En ese caso puedes esperar a que el script agote el tiempo (5 minutos) y luego usar <code>import_cookies_from_file()</code> con las cookies exportadas manualmente desde tu navegador.</p>
+<h3 id="statuscookie_expired-aunque-acabo-de-hacer-login"><code>status=cookie_expired</code> aunque acabo de hacer login</h3>
+<p>Las cookies pueden expirar si la plataforma cierra la sesión de forma remota. Realiza el flujo de refresco (<code>run_login_refresh</code>) para capturar una sesión nueva:</p>
+<pre><code class="language-bash">python -m reaper.auth.login --refresh --account-id tu-account-id
+</code></pre>
+<h3 id="statusrate_limited-la-cuenta-no-se-usa"><code>status=rate_limited</code> — la cuenta no se usa</h3>
+<p>El sistema detectó demasiados errores consecutivos. Primero, comprueba que la cuenta funciona correctamente en el navegador. Luego puedes reactivarla:</p>
+<pre><code class="language-python">await manager.update_status(account_id, AccountStatus.ACTIVE, notes=&quot;Reactivada manualmente&quot;)
+</code></pre>
+<p>O refrescar las cookies si las actuales ya no son válidas:</p>
+<pre><code class="language-bash">python -m reaper.auth.login --refresh --account-id tu-account-id
+</code></pre>
+<h3 id="get_account_for_request-devuelve-none-teniendo-cuentas-registradas"><code>get_account_for_request()</code> devuelve <code>None</code> teniendo cuentas registradas</h3>
+<p>Comprueba el estado de tus cuentas:</p>
+<pre><code class="language-python">cuentas = await manager.list_accounts(&quot;facebook&quot;)
+for c in cuentas:
+    print(c.username, c.status.value, c.has_cookies)
+</code></pre>
+<p>Los estados <code>suspended</code> y <code>cookie_expired</code> son los únicos que bloquean la selección. También es necesario que el archivo <code>cookies.json</code> exista en disco (<code>has_cookies=True</code>).</p>
+<h3 id="las-cookies-no-se-guardan-has_cookiesfalse">Las cookies no se guardan (<code>has_cookies=False</code>)</h3>
+<p>Si creaste una cuenta con <code>add_account()</code> sin pasar <code>cookies</code> ni <code>cookies_file</code>, la cuenta queda en estado <code>unknown</code> sin cookies. Necesitas importarlas:</p>
+<pre><code class="language-python"># Opción 1: flujo de login interactivo
+from reaper.auth.login import run_login_refresh
+await run_login_refresh(manager, cuenta.account_id)
+
+# Opción 2: desde archivo JSON externo
+await manager.import_cookies_from_file(cuenta.account_id, &quot;mis_cookies.json&quot;)
+</code></pre>
+<h3 id="ver-los-logs-detallados">Ver los logs detallados</h3>
+<p>Para ver exactamente qué cuenta está seleccionando Reaper y cómo evoluciona la actividad:</p>
+<pre><code class="language-python">from reaper.utils.logger import setup_logging
+setup_logging(level=&quot;DEBUG&quot;)
+
+manager = AccountManager()
+resultado = await scrape(&quot;https://www.facebook.com/reel/123&quot;, account_manager=manager)
+</code></pre>
+<p>Los logs mostrarán líneas como:</p>
+<pre><code>INFO   Fetch autenticado | platform=facebook | username=mi_usuario | cookies=28 | peticiones_cuenta=12 | score_aprox=91%
+INFO   Extracción completada | parser=ReelParser | url=https://...
+WARNING Umbral de refresco alcanzado | username=mi_usuario | peticiones_desde_refresco=50
+       — Importa cookies frescas con account_manager.import_cookies('uuid', new_cookies)
+</code></pre>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "toc.integrate", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

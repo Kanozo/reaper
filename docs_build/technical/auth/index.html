@@ -1,0 +1,2895 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Librería Python para scraping de Facebook e Instagram">
+      
+      
+      
+      
+        <link rel="prev" href="../reference/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Módulo Auth - Reaper</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#reaper-referencia-tecnica-para-desarrolladores" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Reaper" class="md-header__button md-logo" aria-label="Reaper" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Reaper
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Módulo Auth
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Inicio
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../user/auth/" class="md-tabs__link">
+          
+  
+  
+  Manual de Usuario
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../reference/" class="md-tabs__link">
+          
+  
+  
+  Referencia Técnica
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Reaper" class="md-nav__button md-logo" aria-label="Reaper" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Reaper
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inicio
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual de Usuario
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Manual de Usuario
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user/auth/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cuentas Autenticadas
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referencia Técnica
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Referencia Técnica
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitectura General
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Módulo Auth
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Módulo Auth
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tabla-de-contenidos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tabla de Contenidos
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-vision-general-de-la-arquitectura" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Visión General de la Arquitectura
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Visión General de la Arquitectura">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#principio-de-flujo-de-datos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Principio de flujo de datos
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-entorno-y-requisitos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Entorno y Requisitos
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Entorno y Requisitos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#requisitos-de-sistema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Requisitos de sistema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencias-de-produccion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencias de producción
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencias-de-desarrollo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencias de desarrollo
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-instalacion-y-configuracion-del-entorno-de-desarrollo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Instalación y Configuración del Entorno de Desarrollo
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Instalación y Configuración del Entorno de Desarrollo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#instalacion-completa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instalación completa
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#estructura-de-directorios-de-trabajo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Estructura de directorios de trabajo
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-estructura-del-proyecto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Estructura del Proyecto
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-flujo-de-trabajo-completo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Flujo de Trabajo Completo
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Flujo de Trabajo Completo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#traza-de-ejecucion-de-scrapehttpsfacebookcomreel123" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Traza de ejecución de scrape("https://facebook.com/reel/123")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#diagrama-de-seleccion-de-parser-facebook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Diagrama de selección de parser (Facebook)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-modulo-config-scraperconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Módulo config — ScraperConfig
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Módulo config — ScraperConfig">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#definicion-completa" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definición completa
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#validaciones-en-__post_init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validaciones en __post_init__
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#propiedades-derivadas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Propiedades derivadas
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-modulo-core-reaper-y-excepciones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Módulo core — Reaper y Excepciones
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Módulo core — Reaper y Excepciones">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#clase-reaper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clase Reaper
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#excepciones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Excepciones
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inicializacion-perezosa-del-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inicialización perezosa del logging
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-modulo-network-fetch-e-interceptor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Módulo network — Fetch e Interceptor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Módulo network — Fetch e Interceptor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fetchresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FetchResult
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#capturedtraffic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CapturedTraffic
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#capturedrequest-y-capturedresponse" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CapturedRequest y CapturedResponse
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#contentfetcher-proceso-de-fetch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ContentFetcher — Proceso de fetch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#networkinterceptor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NetworkInterceptor
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-modulo-scrapers-logica-de-orquestacion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Módulo scrapers — Lógica de Orquestación
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Módulo scrapers — Lógica de Orquestación">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#basescraper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BaseScraper
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#facebookscraper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FacebookScraper
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FacebookScraper">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mapas-de-parsers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mapas de parsers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#logica-de-merge-reelvideo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lógica de merge reel↔video
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#logica-de-foto-de-album" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lógica de foto de álbum
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instagramscraper" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InstagramScraper
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-modulo-parsers-extraccion-de-datos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Módulo parsers — Extracción de Datos
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Módulo parsers — Extracción de Datos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#jerarquia-de-herencia" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Jerarquía de herencia
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#baseparser-utilidades-compartidas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BaseParser — Utilidades compartidas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="BaseParser — Utilidades compartidas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#estado-garantizado-en-selfresult-inicializado-por-baseparser__init__" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Estado garantizado en self.result (inicializado por BaseParser.__init__)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metodos-de-utilidad-de-baseparser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Métodos de utilidad de BaseParser
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#facebookcontentparser-metodos-comunes-de-facebook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FacebookContentParser — Métodos comunes de Facebook
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ciclo-de-vida-de-un-parser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ciclo de vida de un parser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#estrategias-de-localizacion-por-parser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Estrategias de localización por parser
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-modulo-utils-utilidades-compartidas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Módulo utils — Utilidades Compartidas
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Módulo utils — Utilidades Compartidas">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fb_url_classifierpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fb_url_classifier.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fb_auth_detectorpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fb_auth_detector.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#loggerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        logger.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#platformspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        platforms.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metricspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metrics.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#encodingpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        encoding.py
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-estructuras-de-datos-resultados-por-tipo-de-contenido" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Estructuras de Datos — Resultados por Tipo de Contenido
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="12. Estructuras de Datos — Resultados por Tipo de Contenido">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#facebook-post-regular-__typename-regular_post" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Facebook — Post regular (__typename: "regular_post")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#facebook-reel-__typename-facebook_reel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Facebook — Reel (__typename: "facebook_reel")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#facebook-video-nativo-__typename-facebook_video" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Facebook — Vídeo nativo (__typename: "facebook_video")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#facebook-grupo-__typename-about_private_group" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Facebook — Grupo (__typename: "about_private_group")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#facebook-perfil-__typename-facebook_user_profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Facebook — Perfil (__typename: "facebook_user_profile")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#facebook-foto-__typename-facebook_photo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Facebook — Foto (__typename: "facebook_photo")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instagram-post-platform-instagram" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instagram — Post (platform: "instagram")
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instagram-reel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instagram — Reel
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-sistema-de-logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Sistema de Logging
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="13. Sistema de Logging">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#jerarquia-de-loggers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Jerarquía de loggers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuracion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuración
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#formato-de-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Formato de logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#debugcontext-debug-puntual" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DebugContext — Debug puntual
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-modo-debug-y-artefactos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Modo Debug y Artefactos
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="14. Modo Debug y Artefactos">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#analisis-offline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Análisis offline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-anadir-un-nuevo-parser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Añadir un Nuevo Parser
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="15. Añadir un Nuevo Parser">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pasos-completos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pasos completos
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-anadir-una-nueva-plataforma" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Añadir una Nueva Plataforma
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-herramientas-de-desarrollo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Herramientas de Desarrollo
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="17. Herramientas de Desarrollo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linting-y-tipos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linting y tipos
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configuracion-de-herramientas-pyprojecttoml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuración de herramientas (pyproject.toml)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18-decisiones-de-diseno" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Decisiones de Diseño
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="18. Decisiones de Diseño">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#por-que-selfresult-se-inicializa-en-baseparser" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Por qué self.result se inicializa en BaseParser
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#por-que-los-parsers-de-facebook-buscan-en-el-html-y-no-solo-en-el-trafico" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Por qué los parsers de Facebook buscan en el HTML y no solo en el tráfico
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#por-que-get_parser_from_fb_url-no-hace-fetch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Por qué get_parser_from_fb_url no hace fetch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#por-que-el-merge-reelvideo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Por qué el merge reel↔video
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#por-que-logginggetlogger__name__-se-envuelve-en-get_logger" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Por qué logging.getLogger(__name__) se envuelve en get_logger()
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="reaper-referencia-tecnica-para-desarrolladores">Reaper — Referencia Técnica para Desarrolladores</h1>
+<blockquote>
+<p><strong>Versión</strong>: 0.1.0 | <strong>Python</strong>: 3.11+ | <strong>Licencia</strong>: MIT</p>
+</blockquote>
+<hr />
+<h2 id="tabla-de-contenidos">Tabla de Contenidos</h2>
+<ol>
+<li><a href="#1-visión-general-de-la-arquitectura">Visión General de la Arquitectura</a></li>
+<li><a href="#2-entorno-y-requisitos">Entorno y Requisitos</a></li>
+<li><a href="#3-instalación-y-configuración-del-entorno-de-desarrollo">Instalación y Configuración del Entorno de Desarrollo</a></li>
+<li><a href="#4-estructura-del-proyecto">Estructura del Proyecto</a></li>
+<li><a href="#5-flujo-de-trabajo-completo">Flujo de Trabajo Completo</a></li>
+<li><a href="#6-módulo-config--scraperconfig">Módulo <code>config</code> — ScraperConfig</a></li>
+<li><a href="#7-módulo-core--reaper-y-excepciones">Módulo <code>core</code> — Reaper y Excepciones</a></li>
+<li><a href="#8-módulo-network--fetch-e-interceptor">Módulo <code>network</code> — Fetch e Interceptor</a></li>
+<li><a href="#9-módulo-scrapers--lógica-de-orquestación">Módulo <code>scrapers</code> — Lógica de Orquestación</a></li>
+<li><a href="#10-módulo-parsers--extracción-de-datos">Módulo <code>parsers</code> — Extracción de Datos</a></li>
+<li><a href="#11-módulo-utils--utilidades-compartidas">Módulo <code>utils</code> — Utilidades Compartidas</a></li>
+<li><a href="#12-estructuras-de-datos--resultados-por-tipo-de-contenido">Estructuras de Datos — Resultados por Tipo de Contenido</a></li>
+<li><a href="#13-sistema-de-logging">Sistema de Logging</a></li>
+<li><a href="#14-modo-debug-y-artefactos">Modo Debug y Artefactos</a></li>
+<li><a href="#15-añadir-un-nuevo-parser">Añadir un Nuevo Parser</a></li>
+<li><a href="#16-añadir-una-nueva-plataforma">Añadir una Nueva Plataforma</a></li>
+<li><a href="#17-herramientas-de-desarrollo">Herramientas de Desarrollo</a></li>
+<li><a href="#18-decisiones-de-diseño">Decisiones de Diseño</a></li>
+</ol>
+<hr />
+<h2 id="1-vision-general-de-la-arquitectura">1. Visión General de la Arquitectura</h2>
+<p>Reaper es una librería de scraping asíncrona estructurada en capas. Cada capa tiene una responsabilidad única y estricta:</p>
+<pre><code>┌─────────────────────────────────────────────────────────┐
+│  API pública  reaper/__init__.py                        │
+│  scrape()  |  Reaper  |  ScrapingError                  │
+├─────────────────────────────────────────────────────────┤
+│  Orquestación  core.py                                  │
+│  Reaper.scrape()  →  _dispatch()  →  Scraper.run()      │
+├─────────────────────────────────────────────────────────┤
+│  Scrapers  scrapers/                                    │
+│  FacebookScraper  |  InstagramScraper                   │
+│  (fetch + selección de parser + fallback + merge)       │
+├─────────────────────────────────────────────────────────┤
+│  Red  network/                                          │
+│  ContentFetcher  |  NetworkInterceptor                  │
+│  (Playwright → HTML + tráfico GraphQL/API)              │
+├─────────────────────────────────────────────────────────┤
+│  Parsers  parsers/                                      │
+│  PostParser | ReelParser | VideoParser | GroupParser    │
+│  ProfileParser | PhotoParser | IgPostParser | IgReelParser│
+│  (HTML + JSON blocks → dict estructurado)               │
+├─────────────────────────────────────────────────────────┤
+│  Utils  utils/                                          │
+│  fb_url_classifier | fb_auth_detector | logger          │
+│  metrics | encoding | http | media | platforms          │
+└─────────────────────────────────────────────────────────┘
+</code></pre>
+<h3 id="principio-de-flujo-de-datos">Principio de flujo de datos</h3>
+<pre><code>URL → ScraperConfig → Reaper → FacebookScraper/InstagramScraper
+    → ContentFetcher → FetchResult{html, traffic}
+    → Parser.parse() → dict[str, Any]
+</code></pre>
+<p>Los datos nunca fluyen hacia arriba. Cada capa solo conoce la que tiene inmediatamente por debajo.</p>
+<hr />
+<h2 id="2-entorno-y-requisitos">2. Entorno y Requisitos</h2>
+<h3 id="requisitos-de-sistema">Requisitos de sistema</h3>
+<table>
+<thead>
+<tr>
+<th>Componente</th>
+<th>Versión mínima</th>
+<th>Propósito</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python</td>
+<td>3.11</td>
+<td>Sintaxis <code>match</code>, <code>X \| Y</code>, <code>str.removeprefix</code></td>
+</tr>
+<tr>
+<td>pip</td>
+<td>23+</td>
+<td>Instalación con <code>pyproject.toml</code></td>
+</tr>
+<tr>
+<td>Firefox (via Playwright)</td>
+<td>1.40+</td>
+<td>Renderizado JavaScript</td>
+</tr>
+<tr>
+<td>Sistema operativo</td>
+<td>Linux / macOS / Windows</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dependencias-de-produccion">Dependencias de producción</h3>
+<pre><code class="language-toml"># pyproject.toml
+dependencies = [
+    &quot;playwright&gt;=1.40.0&quot;,    # Automatización del navegador
+    &quot;beautifulsoup4&gt;=4.12.0&quot;,# Parseo de HTML
+    &quot;httpx&gt;=0.27.0&quot;,         # Cliente HTTP asíncrono (subtítulos, etc.)
+    &quot;requests&gt;=2.31.0&quot;,      # Cliente HTTP síncrono (utilidades)
+]
+</code></pre>
+<h3 id="dependencias-de-desarrollo">Dependencias de desarrollo</h3>
+<pre><code class="language-toml">[project.optional-dependencies]
+dev = [
+    &quot;pytest&gt;=8.0&quot;,
+    &quot;pytest-asyncio&gt;=0.23&quot;,
+    &quot;ruff&gt;=0.4&quot;,
+    &quot;mypy&gt;=1.10&quot;,
+]
+</code></pre>
+<hr />
+<h2 id="3-instalacion-y-configuracion-del-entorno-de-desarrollo">3. Instalación y Configuración del Entorno de Desarrollo</h2>
+<h3 id="instalacion-completa">Instalación completa</h3>
+<pre><code class="language-bash"># 1. Clonar el repositorio
+git clone &lt;repo-url&gt;
+cd reaper
+
+# 2. Crear entorno virtual (recomendado)
+python3.11 -m venv .venv
+source .venv/bin/activate        # Linux/macOS
+# .venv\Scripts\activate         # Windows
+
+# 3. Instalar en modo editable con dependencias de desarrollo
+pip install -e &quot;.[dev]&quot;
+
+# 4. Instalar el navegador Firefox (solo la primera vez)
+playwright install firefox
+
+# 5. Verificar instalación
+python -c &quot;from reaper import scrape, Reaper, ScraperConfig; print('OK')&quot;
+reaper --version
+</code></pre>
+<h3 id="estructura-de-directorios-de-trabajo">Estructura de directorios de trabajo</h3>
+<pre><code>reaper/                         ← raíz del proyecto
+├── src/reaper/                 ← código fuente del paquete
+├── tests/                      ← tests unitarios e integración
+├── data/
+│   ├── debug_artifacts/        ← artefactos de debug (auto-creado)
+│   └── results/                ← resultados JSON (auto-creado)
+├── pyproject.toml              ← configuración del proyecto
+└── README.md
+</code></pre>
+<hr />
+<h2 id="4-estructura-del-proyecto">4. Estructura del Proyecto</h2>
+<pre><code>src/reaper/
+├── __init__.py             # API pública: scrape(), Reaper, excepciones
+├── cli.py                  # Punto de entrada CLI (comando `reaper`)
+├── config.py               # ScraperConfig — único objeto de configuración
+├── core.py                 # Reaper, UnsupportedPlatformError, ScrapingError
+│
+├── network/
+│   ├── __init__.py
+│   ├── interceptor.py      # NetworkInterceptor, CapturedTraffic, FetchResult
+│   └── content_fetcher.py  # ContentFetcher — gestión Playwright + debug
+│
+├── scrapers/
+│   ├── __init__.py
+│   ├── base.py             # BaseScraper (abstracto)
+│   ├── facebook.py         # FacebookScraper — orquesta parsers FB
+│   └── instagram.py        # InstagramScraper — orquesta parsers IG
+│
+├── parsers/
+│   ├── __init__.py         # Re-exportaciones de todos los parsers
+│   ├── base_parser.py      # BaseParser — DFS, safe_get, JSON blocks
+│   ├── facebook/
+│   │   ├── facebook_parser.py  # FacebookContentParser — lógica común FB
+│   │   ├── post_parser.py      # Posts regulares (/posts/, /permalink/)
+│   │   ├── reel_parser.py      # Reels (/reel/)
+│   │   ├── video_parser.py     # Vídeos nativos (/videos/, /watch/)
+│   │   ├── group_parser.py     # Grupos (/groups/)
+│   │   ├── profile_parser.py   # Perfiles de usuario y páginas
+│   │   └── photo_parser.py     # Fotos individuales (/photo.php)
+│   └── instagram/
+│       ├── ig_post_parser.py   # Posts de Instagram (/p/)
+│       └── ig_reel_parser.py   # Reels de Instagram (/reel/)
+│
+└── utils/
+    ├── __init__.py             # Re-exportaciones de utilidades
+    ├── logger.py               # setup_logging, get_logger, DebugContext
+    ├── fb_url_classifier.py    # get_parser_from_fb_url()
+    ├── fb_auth_detector.py     # requires_auth()
+    ├── fb_helpers.py           # Helpers internos de Facebook
+    ├── platforms.py            # detect_platform_from_url()
+    ├── metrics.py              # SocialMediaParser — parseo de métricas
+    ├── encoding.py             # datetime_encoder, decode_alphanumeric_id
+    ├── http.py                 # get_text_from_url()
+    └── media.py                # srt_to_dict()
+</code></pre>
+<hr />
+<h2 id="5-flujo-de-trabajo-completo">5. Flujo de Trabajo Completo</h2>
+<h3 id="traza-de-ejecucion-de-scrapehttpsfacebookcomreel123">Traza de ejecución de <code>scrape("https://facebook.com/reel/123")</code></h3>
+<pre><code>scrape(url)                         [__init__.py]
+  └─→ Reaper().scrape(url)          [core.py]
+        ├─ _logging_initialized?    inicializa setup_logging si es primera vez
+        ├─ ScraperConfig(url=url)   valida y crea configuración
+        ├─ detect_platform_from_url → &quot;facebook&quot;
+        └─→ _dispatch(config, &quot;facebook&quot;)
+              └─→ FacebookScraper(config).run()   [scrapers/facebook.py]
+                    ├─→ ContentFetcher.fetch()    [network/content_fetcher.py]
+                    │     ├─ Playwright: browser → context → page
+                    │     ├─ NetworkInterceptor.attach(page)
+                    │     ├─ page.goto(url)
+                    │     ├─ auto_scroll (si config.auto_scroll)
+                    │     ├─ page.content() → html_content
+                    │     └─→ FetchResult{html, traffic, success}
+                    │
+                    ├─ requires_auth(html, url)  detecta login wall
+                    ├─ get_parser_from_fb_url(url) → &quot;ReelParser&quot;
+                    │
+                    ├─→ ReelParser(html, ...).parse()   [parsers/facebook/reel_parser.py]
+                    │     ├─ _extract_json_blocks()     busca &lt;script type=application/json&gt;
+                    │     ├─ _locate_all_stories()      DFS buscando nodos Story
+                    │     ├─ _build_reaction_cache()    cachea métricas por post_id
+                    │     ├─ _build_reel_dict(story)    construye dict del reel
+                    │     ├─ _parse_traffic()           enriquece con datos GraphQL
+                    │     └─→ dict{platform, status, author, text, ...}
+                    │
+                    ├─ [si __typename=facebook_video] → fetch + ReelParser (merge)
+                    ├─ [si __typename=facebook_reel]  → fetch + VideoParser (merge)
+                    │
+                    ├─ _enrich_with_traffic(result, fetch_result)
+                    └─→ dict[str, Any]   ← resultado final
+</code></pre>
+<h3 id="diagrama-de-seleccion-de-parser-facebook">Diagrama de selección de parser (Facebook)</h3>
+<pre><code>URL Facebook
+    │
+    ▼
+get_parser_from_fb_url(url)
+    │
+    ├─ /hashtag/        → HashtagParser (→ PostParser)
+    ├─ /reel/           → ReelParser
+    ├─ /videos/ | ?v=   → VideoParser
+    ├─ /photo.php | /photo/ → PhotoParser
+    ├─ /groups/*/posts  → PostParser
+    ├─ /groups/         → GroupParser
+    ├─ /*/posts/        → PostParser
+    ├─ profile.php      → ProfileParser
+    ├─ permalink.php    → PostParser
+    ├─ /share/r/        → ReelParser
+    ├─ /share/p/        → PostParser
+    ├─ /people/*/id/    → ProfileParser
+    └─ /&lt;vanity&gt;        → ProfileParser
+</code></pre>
+<hr />
+<h2 id="6-modulo-config-scraperconfig">6. Módulo <code>config</code> — ScraperConfig</h2>
+<p><code>ScraperConfig</code> es un dataclass inmutable que fluye por toda la librería como único objeto de configuración.</p>
+<h3 id="definicion-completa">Definición completa</h3>
+<pre><code class="language-python">@dataclass
+class ScraperConfig:
+    # Obligatorio
+    url: str
+
+    # Navegador
+    headless: bool = True
+    debug: bool = False
+    screenshot: bool = False
+
+    # Scroll
+    auto_scroll: bool = False
+    infinity_scroll: bool = False
+
+    # Proxy
+    proxy_server: str | None = None
+    proxy_username: str | None = None
+    proxy_password: str | None = None
+
+    # Rutas
+    artifacts_dir: Path = field(default_factory=lambda: Path(&quot;data/debug_artifacts&quot;))
+    results_dir:   Path = field(default_factory=lambda: Path(&quot;data/results&quot;))
+</code></pre>
+<h3 id="validaciones-en-__post_init__">Validaciones en <code>__post_init__</code></h3>
+<table>
+<thead>
+<tr>
+<th>Condición</th>
+<th>Excepción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>url</code> vacía</td>
+<td><code>ValueError</code></td>
+</tr>
+<tr>
+<td><code>url</code> sin <code>http://</code> o <code>https://</code></td>
+<td><code>ValueError</code></td>
+</tr>
+<tr>
+<td><code>proxy_username/password</code> sin <code>proxy_server</code></td>
+<td><code>ValueError</code></td>
+</tr>
+<tr>
+<td><code>infinity_scroll=True</code> con <code>auto_scroll=False</code></td>
+<td><code>ValueError</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="propiedades-derivadas">Propiedades derivadas</h3>
+<pre><code class="language-python">config.has_proxy    # bool — True si proxy_server is not None
+config.proxy_config # dict{&quot;server&quot;, &quot;username&quot;?, &quot;password&quot;?} | None
+</code></pre>
+<hr />
+<h2 id="7-modulo-core-reaper-y-excepciones">7. Módulo <code>core</code> — Reaper y Excepciones</h2>
+<h3 id="clase-reaper">Clase <code>Reaper</code></h3>
+<pre><code class="language-python">class Reaper:
+    async def scrape(
+        self,
+        url: str,
+        *,
+        headless: bool = True,
+        debug: bool = False,
+        screenshot: bool = False,
+        auto_scroll: bool = True,
+        infinity_scroll: bool = False,
+        proxy_server: str | None = None,
+        proxy_username: str | None = None,
+        proxy_password: str | None = None,
+    ) -&gt; dict[str, Any]: ...
+</code></pre>
+<p>Internamente:
+1. Llama a <code>setup_logging()</code> en la primera ejecución (modo programático).
+2. Crea <code>ScraperConfig</code> con los parámetros.
+3. Detecta la plataforma con <code>detect_platform_from_url()</code>.
+4. Despacha al scraper apropiado via <code>_dispatch()</code>.
+5. Captura excepciones y las convierte en <code>ScrapingError</code>.</p>
+<h3 id="excepciones">Excepciones</h3>
+<pre><code class="language-python">class UnsupportedPlatformError(Exception):
+    &quot;&quot;&quot;URL no corresponde a ninguna plataforma soportada.
+    Lanzada por Reaper._dispatch() cuando platform == &quot;unknown&quot;.
+    &quot;&quot;&quot;
+
+class ScrapingError(Exception):
+    &quot;&quot;&quot;Error en runtime durante el proceso de scraping.
+    Envuelve cualquier excepción no esperada de los scrapers.
+    &quot;&quot;&quot;
+</code></pre>
+<h3 id="inicializacion-perezosa-del-logging">Inicialización perezosa del logging</h3>
+<pre><code class="language-python">_logging_initialized: bool = False  # módulo-global
+
+# En Reaper.scrape():
+if not _logging_initialized:
+    setup_logging(level=&quot;DEBUG&quot; if debug else &quot;INFO&quot;)
+    _logging_initialized = True
+</code></pre>
+<p>La CLI llama a <code>setup_logging()</code> explícitamente antes de instanciar <code>Reaper</code>, por lo que la rama perezosa solo se ejecuta en uso programático directo.</p>
+<hr />
+<h2 id="8-modulo-network-fetch-e-interceptor">8. Módulo <code>network</code> — Fetch e Interceptor</h2>
+<h3 id="fetchresult"><code>FetchResult</code></h3>
+<p>Objeto retornado por <code>ContentFetcher.fetch()</code>:</p>
+<pre><code class="language-python">@dataclass
+class FetchResult:
+    original_url: str
+    final_url: str | None = None
+    html_content: str | None = None       # HTML con JS ejecutado
+    traffic: CapturedTraffic | None = None
+    fetched_at: datetime = field(default_factory=datetime.now)
+    success: bool = False
+    error: str | None = None
+    authenticated: bool = False
+    account_id: str | None = None
+    debug_session_dir: Path | None = None
+</code></pre>
+<h3 id="capturedtraffic"><code>CapturedTraffic</code></h3>
+<p>Organiza el tráfico de red capturado durante el fetch:</p>
+<pre><code class="language-python">@dataclass
+class CapturedTraffic:
+    graphql_requests:  list[CapturedRequest]   # peticiones a /api/graphql/
+    graphql_responses: list[CapturedResponse]  # respuestas GraphQL
+    api_requests:      list[CapturedRequest]   # peticiones a /api/v1/ (Instagram)
+    api_responses:     list[CapturedResponse]  # respuestas API REST
+
+    def graphql_by_operation(self, operation_name: str) -&gt; list[CapturedResponse]:
+        &quot;&quot;&quot;Filtra por nombre de operación GraphQL (búsqueda parcial).&quot;&quot;&quot;
+
+    def summary(self) -&gt; str:
+        &quot;&quot;&quot;Línea de resumen legible del tráfico.&quot;&quot;&quot;
+</code></pre>
+<h3 id="capturedrequest-y-capturedresponse"><code>CapturedRequest</code> y <code>CapturedResponse</code></h3>
+<pre><code class="language-python">@dataclass
+class CapturedRequest:
+    url: str
+    method: str
+    post_data_raw: str | None = None
+    post_data: dict[str, Any] | None = None
+    headers: dict[str, str] = field(default_factory=dict)
+    graphql_meta: GraphQLMeta | None = None
+
+@dataclass
+class CapturedResponse:
+    url: str
+    status: int
+    body: dict[str, Any] | None = None    # body JSON parseado
+    body_raw: str | None = None
+    headers: dict[str, str] = field(default_factory=dict)
+
+@dataclass
+class GraphQLMeta:
+    friendly_name: str | None = None      # nombre de la operación GraphQL
+    doc_id: str | None = None
+    variables: dict[str, Any] | None = None
+    caller_class: str | None = None
+</code></pre>
+<h3 id="contentfetcher-proceso-de-fetch"><code>ContentFetcher</code> — Proceso de fetch</h3>
+<pre><code class="language-python">class ContentFetcher:
+    def __init__(self, url: str, headless: bool = True, debug: bool = False): ...
+
+    async def fetch(
+        self,
+        screenshot: bool = False,
+        auto_scroll: bool = True,
+        infinity_scroll: bool = False,
+        proxy_server: str | None = None,
+        proxy_username: str | None = None,
+        proxy_password: str | None = None,
+    ) -&gt; FetchResult: ...
+</code></pre>
+<p><strong>Proceso interno de <code>fetch()</code>:</strong></p>
+<pre><code>1. async_playwright() → browser (Firefox)
+2. browser.new_context(viewport, proxy_config)
+3. context.new_page()
+4. NetworkInterceptor.attach(page)   ← ANTES de goto()
+5. page.goto(url, wait_until=&quot;networkidle&quot;)
+6. [auto_scroll] → _auto_scroll_by_height()
+7. [infinity_scroll] → _infinity_scroll_by_network()
+8. [screenshot] → page.locator(...).screenshot()
+9. page.content() → html_content
+10. interceptor.get_traffic() → CapturedTraffic
+11. [debug] → _save_debug_artifacts()
+12. return FetchResult(success=True, ...)
+</code></pre>
+<h3 id="networkinterceptor"><code>NetworkInterceptor</code></h3>
+<p>Se adjunta a la página Playwright antes de <code>goto()</code> y escucha los eventos <code>request</code> y <code>response</code>:</p>
+<pre><code class="language-python">class NetworkInterceptor:
+    GRAPHQL_PATTERNS: frozenset[str]        # URLs de GraphQL de Facebook
+    INSTAGRAM_API_PATTERNS: frozenset[str]  # URLs de API de Instagram
+
+    def attach(self, page: Page) -&gt; None:
+        &quot;&quot;&quot;Registra los handlers en la página.&quot;&quot;&quot;
+
+    def get_traffic(self) -&gt; CapturedTraffic:
+        &quot;&quot;&quot;Retorna el tráfico capturado hasta el momento.&quot;&quot;&quot;
+
+    def snapshot_activity(self) -&gt; int:
+        &quot;&quot;&quot;Retorna el total de responses como baseline para infinity_scroll.&quot;&quot;&quot;
+</code></pre>
+<hr />
+<h2 id="9-modulo-scrapers-logica-de-orquestacion">9. Módulo <code>scrapers</code> — Lógica de Orquestación</h2>
+<h3 id="basescraper"><code>BaseScraper</code></h3>
+<pre><code class="language-python">class BaseScraper(ABC):
+    def __init__(self, config: ScraperConfig) -&gt; None:
+        self.config = config
+        self.logger = get_logger(self.__class__.__module__)
+
+    @abstractmethod
+    async def run(self) -&gt; dict[str, Any]: ...
+
+    def _base_result(self, platform: str) -&gt; dict[str, Any]:
+        return {&quot;url&quot;: self.config.url, &quot;platform&quot;: platform, &quot;status&quot;: &quot;ok&quot;}
+</code></pre>
+<h3 id="facebookscraper"><code>FacebookScraper</code></h3>
+<p>Responsabilidades:</p>
+<ol>
+<li><strong>Fetch</strong> de la URL mediante <code>_fetch()</code>.</li>
+<li><strong>Detección de autenticación</strong> con <code>requires_auth()</code>.</li>
+<li><strong>Selección de parser</strong> con <code>get_parser_from_fb_url()</code>.</li>
+<li><strong>Lógica de merge</strong> reel↔video cuando el contenido es ambiguo.</li>
+<li><strong>Fallback</strong> a parser alternativo si el primario no encuentra datos.</li>
+<li><strong>Enriquecimiento</strong> con <code>graphql_responses_count</code>.</li>
+</ol>
+<h4 id="mapas-de-parsers">Mapas de parsers</h4>
+<pre><code class="language-python">_PRIMARY_PARSER_MAP = {
+    &quot;PostParser&quot;:    PostParser,
+    &quot;ReelParser&quot;:    ReelParser,
+    &quot;VideoParser&quot;:   VideoParser,
+    &quot;GroupParser&quot;:   GroupParser,
+    &quot;ProfileParser&quot;: ProfileParser,
+    &quot;HashtagParser&quot;: PostParser,
+    &quot;PhotoParser&quot;:   PhotoParser,
+}
+
+_FALLBACK_PARSER_MAP = {
+    &quot;ReelParser&quot;:    VideoParser,   # si ReelParser falla, intenta VideoParser
+    &quot;ProfileParser&quot;: GroupParser,   # si ProfileParser falla, intenta GroupParser
+}
+</code></pre>
+<h4 id="logica-de-merge-reelvideo">Lógica de merge reel↔video</h4>
+<p>Facebook sirve el mismo contenido bajo dos URLs diferentes:
+- <code>/reel/&lt;id&gt;</code> → sirve datos de Reel (engagement, texto, hashtags)
+- <code>/watch/?v=&lt;id&gt;</code> → sirve datos de Vídeo (URLs de descarga, métricas técnicas)</p>
+<p>El scraper detecta el <code>__typename</code> y realiza un segundo fetch para combinar ambos:</p>
+<pre><code>__typename == &quot;facebook_video&quot; → fetch /reel/&lt;permalink_url&gt;
+                                → ReelParser → merge(reel, video)
+
+__typename == &quot;facebook_reel&quot;  → fetch /watch/?v=&lt;attachment_id&gt;
+                                → VideoParser → merge(reel, video)
+</code></pre>
+<h4 id="logica-de-foto-de-album">Lógica de foto de álbum</h4>
+<pre><code>__typename == &quot;facebook_photo&quot; AND is_album == True
+    → fetch parent_post_url
+    → PostParser → resultado del post completo con todas las fotos
+</code></pre>
+<h3 id="instagramscraper"><code>InstagramScraper</code></h3>
+<p>Estrategia de dos intentos:</p>
+<pre><code>1. IgPostParser.parse()
+   └─ Si result[&quot;error&quot;] → 2. IgReelParser.parse()
+</code></pre>
+<hr />
+<h2 id="10-modulo-parsers-extraccion-de-datos">10. Módulo <code>parsers</code> — Extracción de Datos</h2>
+<h3 id="jerarquia-de-herencia">Jerarquía de herencia</h3>
+<pre><code>BaseParser  (base_parser.py)
+├── FacebookContentParser  (facebook/facebook_parser.py)
+│   ├── PostParser          (facebook/post_parser.py)
+│   ├── ReelParser          (facebook/reel_parser.py)
+│   ├── VideoParser         (facebook/video_parser.py)
+│   ├── GroupParser         (facebook/group_parser.py)
+│   ├── ProfileParser       (facebook/profile_parser.py)
+│   └── PhotoParser         (facebook/photo_parser.py)
+├── IgPostParser            (instagram/ig_post_parser.py)
+└── IgReelParser            (instagram/ig_reel_parser.py)
+</code></pre>
+<h3 id="baseparser-utilidades-compartidas"><code>BaseParser</code> — Utilidades compartidas</h3>
+<h4 id="estado-garantizado-en-selfresult-inicializado-por-baseparser__init__">Estado garantizado en <code>self.result</code> (inicializado por <code>BaseParser.__init__</code>)</h4>
+<pre><code class="language-python">self.result: dict[str, Any] = {
+    &quot;platform&quot;:           platform,     # &quot;facebook&quot; | &quot;instagram&quot;
+    &quot;status&quot;:             &quot;ok&quot;,
+    &quot;error&quot;:              None,
+    &quot;raw_data_available&quot;: False,
+    &quot;scraped_at&quot;:         datetime.now(),
+    &quot;final_url&quot;:          self.final_url,
+    &quot;post_url&quot;:           self.original_url,
+}
+</code></pre>
+<p>Las subclases añaden sus campos específicos con <code>self.result.update({...})</code>.</p>
+<h4 id="metodos-de-utilidad-de-baseparser">Métodos de utilidad de <code>BaseParser</code></h4>
+<pre><code class="language-python"># Búsqueda DFS — primer resultado
+def _recursive_search(
+    self,
+    data: Any,
+    condition: Callable[[dict], bool],
+    extract: Callable[[dict], Any] | None = None,
+) -&gt; Any | None: ...
+
+# Búsqueda DFS — todos los resultados
+def _find_all_nodes(
+    self,
+    data: Any,
+    condition: Callable[[dict], bool],
+    depth: int = 0,
+    max_depth: int = 50,
+) -&gt; list[dict]: ...
+
+# Acceso seguro a rutas anidadas (nunca lanza KeyError)
+def _safe_get(self, data: Any, *keys: str, default: Any = None) -&gt; Any: ...
+
+# Extrae bloques &lt;script type=&quot;application/json&quot;&gt; del HTML
+def _extract_json_blocks(self) -&gt; list[dict]: ...
+
+# Convierte timestamp Unix a datetime
+@staticmethod
+def _parse_timestamp(ts: Any) -&gt; datetime | None: ...
+
+# Obtiene respuestas GraphQL por nombre de operación
+def _get_graphql_response_by_operation(self, operation_name: str) -&gt; list[dict]: ...
+def _get_first_graphql_response(self, operation_name: str) -&gt; dict | None: ...
+</code></pre>
+<h3 id="facebookcontentparser-metodos-comunes-de-facebook"><code>FacebookContentParser</code> — Métodos comunes de Facebook</h3>
+<pre><code class="language-python"># Extrae actor/author desde nodos Story (3 rutas de fallback)
+def _extract_author_common(self, story: dict, fallback_path: list[str] | None = None) -&gt; dict: ...
+
+# Extrae datos del grupo si el post pertenece a uno
+def _extract_group_common(self, story: dict, ...) -&gt; dict | None: ...
+
+# Extrae reaction_count, share_count, comments_count, reactions
+def _extract_feedback_common(self, story: dict, ...) -&gt; dict: ...
+
+# Extrae adjuntos (fotos, vídeos, álbumes)
+def _extract_attachments_common(self, story: dict, ...) -&gt; list[dict]: ...
+
+# Parsea hashtags y menciones desde message.ranges
+def _parse_ranges(self, ranges: list[dict]) -&gt; tuple[list[dict], list[dict]]: ...
+
+# Extrae el post original cuando es un share/repost
+def _extract_original_post_common(self, story: dict) -&gt; dict | None: ...
+
+# Enriquece self.result con metadatos del tráfico GraphQL
+def _parse_facebook_traffic(self, operation_patterns: list[str]) -&gt; None: ...
+</code></pre>
+<h3 id="ciclo-de-vida-de-un-parser">Ciclo de vida de un parser</h3>
+<pre><code class="language-python">parser = PostParser(
+    html_content=fetch_result.html_content,
+    final_url=final_url,
+    original_url=fetch_result.original_url,
+    traffic=fetch_result.traffic,
+    debug=self.config.debug,
+)
+result = parser.parse()
+</code></pre>
+<p>Internamente <code>parse()</code> sigue siempre el mismo flujo:</p>
+<pre><code>_extract_json_blocks()      # parsea todos los &lt;script type=&quot;application/json&quot;&gt;
+_locate_*()                 # localiza los nodos clave con DFS
+if not found: return error  # early return si no hay datos
+_extract_basic_info()       # id, timestamp, permalink
+_extract_author()           # actor / actors[0]
+_extract_content()          # texto, hashtags, menciones
+_extract_attachments()      # fotos, vídeos
+_extract_feedback()         # reacciones, shares, comentarios
+_parse_traffic()            # tráfico GraphQL adicional
+return self.result
+</code></pre>
+<h3 id="estrategias-de-localizacion-por-parser">Estrategias de localización por parser</h3>
+<table>
+<thead>
+<tr>
+<th>Parser</th>
+<th>Nodo buscado</th>
+<th>Condición</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PostParser</code></td>
+<td>Story</td>
+<td><code>__isFeedUnit == "Story"</code></td>
+</tr>
+<tr>
+<td><code>ReelParser</code></td>
+<td>creation_story</td>
+<td><code>short_form_video_context</code> o <code>post_id</code></td>
+</tr>
+<tr>
+<td><code>VideoParser</code></td>
+<td>Nodo vídeo</td>
+<td><code>__typename == "Video"</code> con id numérico</td>
+</tr>
+<tr>
+<td><code>GroupParser</code></td>
+<td>Nodo grupo</td>
+<td><code>profile_header_renderer</code> o <code>__bbox.result.data.group</code></td>
+</tr>
+<tr>
+<td><code>ProfileParser</code></td>
+<td>Nodo perfil</td>
+<td><code>__typename</code> en <code>User/UserProfile/Page</code></td>
+</tr>
+<tr>
+<td><code>PhotoParser</code></td>
+<td>currMedia</td>
+<td><code>__typename == "Photo"</code> + <code>image</code> dict + <code>creation_story</code></td>
+</tr>
+<tr>
+<td><code>IgPostParser</code></td>
+<td>Post IG</td>
+<td><code>xdt_api__v1__media__shortcode__web_info</code></td>
+</tr>
+<tr>
+<td><code>IgReelParser</code></td>
+<td>Reel IG</td>
+<td><code>xdt_api__v1__clips__clips_on_logged_out_connection_v2</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="11-modulo-utils-utilidades-compartidas">11. Módulo <code>utils</code> — Utilidades Compartidas</h2>
+<h3 id="fb_url_classifierpy"><code>fb_url_classifier.py</code></h3>
+<pre><code class="language-python">def get_parser_from_fb_url(url: str) -&gt; str:
+    &quot;&quot;&quot;Devuelve el nombre del parser sin hacer ninguna petición HTTP.
+    Posibles valores: PostParser | ReelParser | VideoParser | GroupParser
+                     | ProfileParser | PhotoParser | HashtagParser | UnknownParser
+    &quot;&quot;&quot;
+</code></pre>
+<p>Internamente normaliza la URL (elimina parámetros de tracking, convierte <code>m.facebook.com</code> → <code>www.facebook.com</code>) y aplica 15 reglas regex en orden de prioridad.</p>
+<h3 id="fb_auth_detectorpy"><code>fb_auth_detector.py</code></h3>
+<pre><code class="language-python">@dataclass
+class AuthResult:
+    requires_auth: bool
+    reason: str
+
+def requires_auth(html_content: str, url: str) -&gt; AuthResult:
+    &quot;&quot;&quot;Detecta si la página requiere autenticación analizando el HTML.&quot;&quot;&quot;
+</code></pre>
+<h3 id="loggerpy"><code>logger.py</code></h3>
+<pre><code class="language-python">def setup_logging(
+    level: str | int = &quot;INFO&quot;,
+    use_color: bool | None = None,  # None = autodetectar TTY
+    log_file: str | None = None,
+    propagate: bool = False,
+) -&gt; None: ...
+
+def get_logger(name: str) -&gt; logging.Logger:
+    &quot;&quot;&quot;Equivalente a logging.getLogger(name). Punto único de importación.&quot;&quot;&quot;
+
+class DebugContext:
+    &quot;&quot;&quot;Context manager que activa temporalmente DEBUG en un logger.&quot;&quot;&quot;
+    def __init__(self, logger_name: str = &quot;reaper&quot;, level: int = logging.DEBUG): ...
+</code></pre>
+<h3 id="platformspy"><code>platforms.py</code></h3>
+<pre><code class="language-python">def detect_platform_from_url(url: str) -&gt; str:
+    &quot;&quot;&quot;Retorna &quot;facebook&quot; | &quot;instagram&quot; | &quot;unknown&quot;.&quot;&quot;&quot;
+
+FACEBOOK_DOMAINS: frozenset[str]
+INSTAGRAM_DOMAINS: frozenset[str]
+PLATFORM_DOMAINS: dict[str, frozenset[str]]
+</code></pre>
+<h3 id="metricspy"><code>metrics.py</code></h3>
+<pre><code class="language-python">class SocialMediaParser:
+    &quot;&quot;&quot;Parsea valores de métricas de texto a enteros.
+    Maneja formatos como: &quot;1.2K&quot;, &quot;45,3K&quot;, &quot;1M&quot;, &quot;23 456&quot;.
+    &quot;&quot;&quot;
+    result: dict[str, int]  # acumulador
+
+    def _parse_metric(self, value: str | int | float | None, field_name: str) -&gt; int: ...
+    def parse_engagement_metrics(
+        self,
+        reaction_count: str | int | float | None,
+        share_count: str | int | float | None,
+        comment_count: str | int | float | None = None,
+    ) -&gt; dict[str, int]: ...
+</code></pre>
+<h3 id="encodingpy"><code>encoding.py</code></h3>
+<pre><code class="language-python">def datetime_encoder(obj: Any) -&gt; str:
+    &quot;&quot;&quot;Serializa datetime a ISO 8601 para json.dumps(default=...).&quot;&quot;&quot;
+
+def decode_alphanumeric_id(encoded_id: str) -&gt; str:
+    &quot;&quot;&quot;Decodifica IDs alfanuméricos de Facebook (base64 → numeric string).&quot;&quot;&quot;
+</code></pre>
+<hr />
+<h2 id="12-estructuras-de-datos-resultados-por-tipo-de-contenido">12. Estructuras de Datos — Resultados por Tipo de Contenido</h2>
+<p>Todos los resultados comparten el esqueleto base:</p>
+<pre><code class="language-python">{
+    &quot;platform&quot;:           str,       # &quot;facebook&quot; | &quot;instagram&quot;
+    &quot;status&quot;:             str,       # &quot;ok&quot; | &quot;error&quot;
+    &quot;error&quot;:              str | None,
+    &quot;raw_data_available&quot;: bool,
+    &quot;scraped_at&quot;:         datetime,
+    &quot;final_url&quot;:          str,
+    &quot;post_url&quot;:           str,
+}
+</code></pre>
+<h3 id="facebook-post-regular-__typename-regular_post">Facebook — Post regular (<code>__typename: "regular_post"</code>)</h3>
+<pre><code class="language-python">{
+    # ── Base ───────────────────────────────
+    &quot;platform&quot;:           &quot;facebook&quot;,
+    &quot;status&quot;:             &quot;ok&quot;,
+    &quot;error&quot;:              None,
+    &quot;raw_data_available&quot;: True,
+    &quot;scraped_at&quot;:         datetime,
+    &quot;final_url&quot;:          str,
+    &quot;post_url&quot;:           str,
+    &quot;__typename&quot;:         &quot;regular_post&quot;,
+    # ── Identificación ─────────────────────
+    &quot;id&quot;:                 str,          # post_id numérico
+    &quot;posted_at&quot;:          datetime | None,
+    &quot;permalink_url&quot;:      str,
+    &quot;is_sponsored&quot;:       bool,
+    # ── Autor ──────────────────────────────
+    &quot;author&quot;: {
+        &quot;id&quot;:          str,
+        &quot;name&quot;:        str,
+        &quot;url&quot;:         str,
+        &quot;avatar&quot;:      str,             # URL de la foto de perfil
+        &quot;is_verified&quot;: bool,
+        &quot;work_info&quot;:   str | None,
+    },
+    # ── Contenido ──────────────────────────
+    &quot;text&quot;:        str,
+    &quot;hashtags&quot;: [{&quot;tag&quot;: str, &quot;id&quot;: str, &quot;url&quot;: str, &quot;mobile_url&quot;: str}],
+    &quot;mentions&quot;: [{&quot;id&quot;: str, &quot;url&quot;: str}],
+    # ── Adjuntos ───────────────────────────
+    &quot;attachments&quot;: [
+        {
+            &quot;type&quot;:    str,             # &quot;photo&quot; | &quot;video&quot; | &quot;link&quot; | ...
+            &quot;id&quot;:      str,
+            &quot;url&quot;:     str,
+            &quot;caption&quot;: str | list,
+        }
+    ],
+    # ── Engagement ─────────────────────────
+    &quot;reaction_count&quot;: int,
+    &quot;share_count&quot;:    int,
+    &quot;comments_count&quot;: int,
+    &quot;reactions&quot;: [{&quot;id&quot;: str, &quot;type&quot;: str, &quot;count&quot;: int}],
+    &quot;comments&quot;: [
+        {
+            &quot;id&quot;:           str,
+            &quot;depth&quot;:        int,        # 0 = comentario raíz, 1+ = reply
+            &quot;text&quot;:         str | None,
+            &quot;created_at&quot;:   datetime | None,
+            &quot;author&quot;: {
+                &quot;id&quot;: str, &quot;name&quot;: str, &quot;profile_url&quot;: str,
+                &quot;gender&quot;: str, &quot;avatar&quot;: str | None,
+            },
+            &quot;replies_count&quot;:  int,
+            &quot;reactions&quot;:      list,
+            &quot;reaction_count&quot;: int,
+        }
+    ],
+    # ── Contexto ───────────────────────────
+    &quot;group&quot;: {
+        &quot;id&quot;: str, &quot;name&quot;: str, &quot;url&quot;: str, &quot;avatar&quot;: str,
+    } | None,
+    &quot;original_post&quot;: dict | None,       # si es un share/repost
+    # ── Tráfico GraphQL ────────────────────
+    &quot;graphql_responses_count&quot;:    int,
+    &quot;traffic_parsed&quot;:             bool,
+    &quot;graphql_responses_available&quot;:int,
+    &quot;api_responses_available&quot;:    int,
+    &quot;graphql_operations_found&quot;:   dict[str, int],
+}
+</code></pre>
+<h3 id="facebook-reel-__typename-facebook_reel">Facebook — Reel (<code>__typename: "facebook_reel"</code>)</h3>
+<pre><code class="language-python">{
+    # (campos base + author + text + hashtags + mentions comunes)
+    &quot;__typename&quot;:     &quot;facebook_reel&quot;,
+    &quot;id&quot;:             str,
+    &quot;posted_at&quot;:      datetime | None,
+    &quot;permalink_url&quot;:  str,
+    &quot;reaction_count&quot;: int,
+    &quot;comments_count&quot;: int,
+    &quot;share_count&quot;:    int,
+    &quot;privacy&quot;:        str,              # &quot;Public&quot; | &quot;Friends&quot; | ...
+    &quot;is_ad&quot;:          bool,
+    &quot;attachments&quot;: [
+        {
+            &quot;type&quot;:          &quot;reel&quot;,
+            &quot;id&quot;:            str,
+            &quot;url&quot;:           str | None,         # URL SD del vídeo
+            &quot;caption&quot;:       list,               # SRT/subtítulos
+            &quot;thumbnail_url&quot;: str | None,
+            &quot;duration_ms&quot;:   int | None,
+            &quot;width&quot;:         int | None,
+            &quot;height&quot;:        int | None,
+            &quot;play_count&quot;:    int | None,
+        }
+    ],
+    &quot;group&quot;:         dict | None,
+    &quot;original_post&quot;: dict | None,
+    &quot;collaborators&quot;: list,
+    &quot;reactions&quot;:     list[dict],
+    &quot;feed&quot;: [                           # reels relacionados en la misma página
+        {&quot;__typename&quot;: &quot;feed_facebook_reel&quot;, ...}
+    ],
+    &quot;feed_video&quot;: [dict],              # vídeos del merge reel+video
+}
+</code></pre>
+<h3 id="facebook-video-nativo-__typename-facebook_video">Facebook — Vídeo nativo (<code>__typename: "facebook_video"</code>)</h3>
+<pre><code class="language-python">{
+    &quot;__typename&quot;:         &quot;facebook_video&quot;,
+    &quot;id&quot;:                 str,
+    &quot;posted_at&quot;:          datetime | None,
+    &quot;permalink_url&quot;:      str,
+    &quot;title&quot;:              str,
+    &quot;title_story&quot;:        str,
+    &quot;text&quot;:               str,
+    &quot;hashtags&quot;:           list,
+    &quot;mentions&quot;:           list,
+    &quot;author&quot;:             dict,
+    &quot;privacy&quot;:            dict | None,
+    &quot;collaborators&quot;:      list,
+    &quot;thumbnail_url&quot;:      str | None,
+    &quot;video&quot;: {
+        &quot;url_sd&quot;:      str | None,
+        &quot;captions&quot;:    list,            # subtítulos SRT parseados
+        &quot;duration_ms&quot;: int | None,
+        &quot;width&quot;:       int | None,
+        &quot;height&quot;:      int | None,
+        &quot;is_looping&quot;:  bool,
+        &quot;is_spherical&quot;: bool,
+    },
+    &quot;is_gaming_video&quot;:    bool,
+    &quot;is_podcast_video&quot;:   bool,
+    &quot;is_looping&quot;:         bool,
+    &quot;is_spherical&quot;:       bool,
+    &quot;is_video_broadcast&quot;: bool,
+    &quot;is_live_streaming&quot;:  bool,
+    &quot;broadcast_id&quot;:       str | None,
+    &quot;reaction_count&quot;:     int,
+    &quot;reactions&quot;:          list,
+    &quot;comments_count&quot;:     int,
+    &quot;share_count&quot;:        int,
+    &quot;play_count&quot;:         int | None,
+    &quot;video_view_count&quot;:   int | None,
+    &quot;video_post_view_count&quot;: int | None,
+    &quot;feed&quot;: [dict],                     # vídeos relacionados
+}
+</code></pre>
+<h3 id="facebook-grupo-__typename-about_private_group">Facebook — Grupo (<code>__typename: "about_private_group"</code>)</h3>
+<pre><code class="language-python">{
+    &quot;__typename&quot;:    &quot;about_private_group&quot;,
+    &quot;group_url&quot;:     str,
+    &quot;id&quot;:            str,
+    &quot;name&quot;:          str,
+    &quot;url&quot;:           str,
+    &quot;privacy&quot;: {
+        &quot;level&quot;:       str,             # &quot;CLOSED&quot; | &quot;OPEN&quot; | &quot;SECRET&quot;
+        &quot;description&quot;: str,
+        &quot;is_private&quot;:  bool,
+    },
+    &quot;cover_photo&quot;: {
+        &quot;photo_id&quot;: str,
+        &quot;cdn_uri&quot;:  str,
+    } | None,
+    &quot;description&quot;:       str,
+    &quot;created_at&quot;:        datetime | None,
+    &quot;total_members&quot;:     int,
+    &quot;total_members_text&quot;:str,
+    &quot;posts_last_day&quot;:    int | None,
+    &quot;admins&quot;: [
+        {&quot;id&quot;: str, &quot;name&quot;: str, &quot;url&quot;: str, &quot;avatar&quot;: str}
+    ],
+    &quot;admins_count&quot;:      int,
+    &quot;viewer&quot;: {
+        &quot;is_member&quot;:       bool,
+        &quot;membership_state&quot;: str | None,
+    },
+    &quot;content_gated&quot;:     bool,         # True si el contenido requiere ser miembro
+    &quot;requested_post_id&quot;: str | None,   # post_id si la URL apuntaba a un permalink
+}
+</code></pre>
+<h3 id="facebook-perfil-__typename-facebook_user_profile">Facebook — Perfil (<code>__typename: "facebook_user_profile"</code>)</h3>
+<pre><code class="language-python">{
+    &quot;__typename&quot;:    &quot;facebook_user_profile&quot;,
+    &quot;profile_url&quot;:   str,
+    &quot;id&quot;:            str,
+    &quot;name&quot;:          str,
+    &quot;url&quot;:           str,
+    &quot;username&quot;:      str | None,
+    &quot;gender&quot;:        str,
+    &quot;alternate_name&quot;:str,
+    &quot;avatar&quot;:        str,              # URL foto de perfil (120x120)
+    &quot;profile_video&quot;: dict | None,
+    &quot;banner&quot;: {
+        &quot;photo_id&quot;: str, &quot;cdn_uri&quot;: str,
+    } | None,
+    &quot;bio&quot;:           str,
+    &quot;category&quot;:      str | None,
+    # Métricas
+    &quot;followers_count&quot;:     int,
+    &quot;following_count&quot;:     int,
+    &quot;friends_count&quot;:       int,
+    &quot;likes_count&quot;:         int,        # para páginas
+    &quot;talking_about_count&quot;: int,
+    # Página delegada (si es perfil de página)
+    &quot;delegate_page&quot;:          dict | None,
+    &quot;is_business_page_active&quot;:bool,
+    # Datos biográficos
+    &quot;education&quot;:    {&quot;text&quot;: str, &quot;name&quot;: str, &quot;url&quot;: str, &quot;id&quot;: str},
+    &quot;current_city&quot;: {&quot;text&quot;: str, &quot;name&quot;: str, &quot;url&quot;: str, &quot;id&quot;: str},
+    &quot;hometown&quot;:     {&quot;text&quot;: str, &quot;name&quot;: str, &quot;url&quot;: str, &quot;id&quot;: str},
+    &quot;contact_info&quot;: {
+        &quot;email&quot;:           str,
+        &quot;phone&quot;:           str,
+        &quot;websites&quot;:        list[str],
+        &quot;social_accounts&quot;: list[dict],
+    },
+    # Timeline
+    &quot;feed&quot;: [dict],                    # posts del timeline del perfil
+}
+</code></pre>
+<h3 id="facebook-foto-__typename-facebook_photo">Facebook — Foto (<code>__typename: "facebook_photo"</code>)</h3>
+<pre><code class="language-python">{
+    &quot;__typename&quot;:           &quot;facebook_photo&quot;,
+    &quot;id&quot;:                   str,       # photo_id
+    &quot;posted_at&quot;:            datetime | None,
+    &quot;permalink_url&quot;:        str,       # URL del post padre
+    &quot;is_sponsored&quot;:         bool,
+    &quot;is_album&quot;:             bool,      # True si pertenece a un álbum MULTI_IMAGE
+    &quot;parent_post_url&quot;:      str | None,# URL del post padre (para re-fetch si is_album)
+    &quot;author&quot;:               dict,
+    &quot;attachments&quot;: [
+        {
+            &quot;type&quot;:                  &quot;photo&quot;,
+            &quot;id&quot;:                    str,
+            &quot;url&quot;:                   str,   # URL CDN de la imagen
+            &quot;width&quot;:                 int | None,
+            &quot;height&quot;:                int | None,
+            &quot;accessibility_caption&quot;: str,
+        }
+    ],
+    &quot;text&quot;:        str,                # caption (vacío en fotos de álbum sin caption)
+    &quot;hashtags&quot;:    list,
+    &quot;mentions&quot;:    list,
+    &quot;reaction_count&quot;: int,
+    &quot;share_count&quot;:    int,
+    &quot;comments_count&quot;: int,
+    &quot;reactions&quot;:      list,
+    &quot;comments&quot;:       list,
+    &quot;group&quot;:          dict | None,
+}
+</code></pre>
+<h3 id="instagram-post-platform-instagram">Instagram — Post (<code>platform: "instagram"</code>)</h3>
+<pre><code class="language-python">{
+    &quot;platform&quot;:           &quot;instagram&quot;,
+    &quot;status&quot;:             &quot;ok&quot;,
+    &quot;code&quot;:               str,         # shortcode del post (ej. &quot;DVQ7dz...&quot;)
+    &quot;id&quot;:                 str,
+    &quot;pk&quot;:                 str,
+    &quot;permalink_url&quot;:      str,
+    &quot;posted_at&quot;:          datetime | None,
+    &quot;user&quot;: {
+        &quot;id&quot;:              str,
+        &quot;username&quot;:        str,
+        &quot;full_name&quot;:       str,
+        &quot;profile_pic_url&quot;: str,
+        &quot;is_verified&quot;:     bool,
+    },
+    &quot;group&quot;:              Any | None,
+    &quot;location&quot;:           Any | None,
+    &quot;media_type&quot;:         str,         # &quot;Photo&quot; | &quot;Reel&quot; | &quot;carousel&quot;
+    &quot;carousel_media_count&quot;: int | None,
+    &quot;thumbnail&quot;:          str | None,  # display_uri
+    &quot;caption&quot;:            str | None,  # accessibility_caption
+    &quot;text&quot;:               str | None,  # caption.text
+    &quot;like_count&quot;:         int,
+    &quot;comment_count&quot;:      int,
+    &quot;link&quot;:               str | None,
+    &quot;image_versions&quot;:     list | None, # candidates de image_versions2
+    &quot;video_versions&quot;:     list | None,
+    &quot;tagged_users&quot;:       list[dict],
+    &quot;comments&quot;:           list[dict],  # preview_comments
+    &quot;feed&quot;:               list[dict],  # otros posts del perfil del autor
+}
+</code></pre>
+<h3 id="instagram-reel">Instagram — Reel</h3>
+<p>Misma estructura que el post de Instagram pero con campo adicional:</p>
+<pre><code class="language-python">{
+    # (todos los campos de Instagram Post)
+    &quot;media_repost_count&quot;: int,
+    &quot;feed&quot;: list[dict],  # reels relacionados + posts del perfil
+}
+</code></pre>
+<hr />
+<h2 id="13-sistema-de-logging">13. Sistema de Logging</h2>
+<h3 id="jerarquia-de-loggers">Jerarquía de loggers</h3>
+<pre><code>reaper                              ← logger raíz (configurado por setup_logging)
+├── reaper.cli
+├── reaper.core
+├── reaper.scrapers.facebook
+├── reaper.scrapers.instagram
+├── reaper.network.content_fetcher
+├── reaper.network.interceptor
+└── reaper.parsers
+    ├── reaper.parsers.base_parser
+    ├── reaper.parsers.facebook.post_parser
+    ├── reaper.parsers.facebook.reel_parser
+    └── ...
+</code></pre>
+<h3 id="configuracion">Configuración</h3>
+<pre><code class="language-python">from reaper.utils.logger import setup_logging
+
+# Normal (INFO)
+setup_logging(level=&quot;INFO&quot;)
+
+# Debug con colores (TTY)
+setup_logging(level=&quot;DEBUG&quot;, use_color=True)
+
+# Producción con fichero
+setup_logging(level=&quot;WARNING&quot;, log_file=&quot;/var/log/reaper.log&quot;)
+
+# En cada módulo
+from reaper.utils.logger import get_logger
+logger = get_logger(__name__)
+</code></pre>
+<h3 id="formato-de-logs">Formato de logs</h3>
+<p><strong>Modo INFO</strong> (sin milisegundos):</p>
+<pre><code>14:22:31 INFO     scrapers.facebook  Iniciando extracción Facebook | url=...
+14:22:32 INFO     network.content_fetcher  Navegando a: https://...
+14:22:35 INFO     scrapers.facebook  Extracción completada | parser=ReelParser
+</code></pre>
+<p><strong>Modo DEBUG</strong> (con milisegundos):</p>
+<pre><code>14:22:31.045 DEBUG    parsers.facebook.reel_parser  Nodo Story localizado.
+14:22:31.047 DEBUG    network.interceptor  ↑ [GRAPHQL] ReelQuery POST ...
+14:22:32.123 DEBUG    parsers.facebook.reel_parser  GraphQL op 'Reel': 3 responses
+</code></pre>
+<h3 id="debugcontext-debug-puntual"><code>DebugContext</code> — Debug puntual</h3>
+<pre><code class="language-python">from reaper.utils.logger import DebugContext
+
+# Solo para el parser de fotos
+with DebugContext(&quot;reaper.parsers.facebook.photo_parser&quot;):
+    result = PhotoParser(...).parse()
+
+# Para toda la capa de parsers
+with DebugContext(&quot;reaper.parsers&quot;):
+    result = await scrape(url)
+
+# Restaura el nivel automáticamente al salir del contexto
+</code></pre>
+<hr />
+<h2 id="14-modo-debug-y-artefactos">14. Modo Debug y Artefactos</h2>
+<p>Con <code>debug=True</code>, por cada sesión se crea un directorio en <code>data/debug_artifacts/</code>:</p>
+<pre><code>data/debug_artifacts/
+└── www.facebook.com_reel_123_20250601_143022/
+    ├── meta.json                   ← metadatos de la sesión
+    ├── page.html                   ← HTML completo renderizado
+    ├── screenshot_full.png         ← captura de pantalla (si screenshot=True)
+    ├── traffic.json                ← índice del tráfico de red
+    ├── graphql_requests/
+    │   └── 000_ReelQuery.json
+    ├── graphql_responses/
+    │   ├── 000_ReelQuery.json
+    │   └── 001_CommentsQuery.json
+    ├── api_requests/
+    └── api_responses/
+</code></pre>
+<h3 id="analisis-offline">Análisis offline</h3>
+<pre><code class="language-python">from reaper.network.content_fetcher import load_debug_session, list_debug_sessions
+from reaper.parsers import ReelParser
+
+# Listar sesiones disponibles
+sessions = list_debug_sessions(&quot;data/debug_artifacts&quot;)
+for s in sessions:
+    print(s[&quot;fetched_at&quot;], s[&quot;original_url&quot;][:60])
+
+# Cargar y parsear sin navegador
+fetch_result = load_debug_session(sessions[0][&quot;path&quot;])
+result = ReelParser(
+    html_content=fetch_result.html_content,
+    final_url=fetch_result.final_url,
+    original_url=fetch_result.original_url,
+    traffic=fetch_result.traffic,
+    debug=True,
+).parse()
+</code></pre>
+<hr />
+<h2 id="15-anadir-un-nuevo-parser">15. Añadir un Nuevo Parser</h2>
+<h3 id="pasos-completos">Pasos completos</h3>
+<p><strong>1. Crear el archivo del parser</strong></p>
+<pre><code class="language-python"># src/reaper/parsers/facebook/event_parser.py
+from reaper.parsers.facebook.facebook_parser import FacebookContentParser
+from reaper.utils.logger import get_logger
+from typing import Any
+import traceback
+
+logger = get_logger(__name__)
+
+class EventParser(FacebookContentParser):
+    &quot;&quot;&quot;Parser para eventos de Facebook (/events/&lt;id&gt;).&quot;&quot;&quot;
+
+    def __init__(self, html_content, final_url, original_url, traffic=None, debug=False):
+        super().__init__(html_content, final_url, original_url, traffic, debug)
+        self.result.update({
+            &quot;__typename&quot;: &quot;facebook_event&quot;,
+        })
+
+    def parse(self) -&gt; dict[str, Any]:
+        logger.info(&quot;Iniciando extracción de EVENTO | url=%s&quot;, self.final_url)
+        self._blocks = self._extract_json_blocks()
+
+        if not self._locate_event_node():
+            self.result[&quot;error&quot;] = &quot;No se encontró el nodo de evento.&quot;
+            return self.result
+
+        self.result[&quot;raw_data_available&quot;] = True
+
+        try:
+            self._extract_event_info()
+            self._parse_traffic()
+        except Exception as exc:
+            self.result[&quot;error&quot;] = str(exc)
+            logger.error(&quot;Error parseando evento: %s&quot;, exc)
+            if self.debug:
+                traceback.print_exc()
+
+        return self.result
+
+    def _locate_event_node(self) -&gt; bool:
+        for block in self._blocks:
+            node = self._recursive_search(
+                block,
+                condition=lambda n: n.get(&quot;__typename&quot;) == &quot;Event&quot; and &quot;name&quot; in n,
+            )
+            if node:
+                self._event_node = node
+                return True
+        return False
+
+    def _extract_event_info(self) -&gt; None:
+        node = self._event_node
+        self.result[&quot;id&quot;]       = node.get(&quot;id&quot;, &quot;unknown&quot;)
+        self.result[&quot;name&quot;]     = node.get(&quot;name&quot;, &quot;&quot;)
+        self.result[&quot;start_at&quot;] = self._parse_timestamp(node.get(&quot;start_timestamp&quot;))
+        # ... más campos
+
+    def _parse_traffic(self) -&gt; None:
+        self._parse_facebook_traffic(operation_patterns=[&quot;EventQuery&quot;])
+</code></pre>
+<p><strong>2. Registrar en <code>parsers/__init__.py</code></strong></p>
+<pre><code class="language-python">from reaper.parsers.facebook.event_parser import EventParser
+
+__all__ = [..., &quot;EventParser&quot;]
+</code></pre>
+<p><strong>3. Registrar en <code>scrapers/facebook.py</code></strong></p>
+<pre><code class="language-python">from reaper.parsers import ..., EventParser
+
+_PRIMARY_PARSER_MAP = {
+    ...,
+    &quot;EventParser&quot;: EventParser,
+}
+</code></pre>
+<p><strong>4. Actualizar el clasificador de URLs</strong></p>
+<pre><code class="language-python"># utils/fb_url_classifier.py
+# Añadir en get_parser_from_fb_url():
+if re.match(r&quot;^/events/\d+&quot;, path, re.I):
+    return &quot;EventParser&quot;
+</code></pre>
+<p><strong>5. Añadir a <code>_RESERVED</code> si aplica</strong></p>
+<pre><code class="language-python">_RESERVED: frozenset[str] = frozenset({
+    ...,
+    &quot;events&quot;,  # ya está, pero verificar
+})
+</code></pre>
+<hr />
+<h2 id="16-anadir-una-nueva-plataforma">16. Añadir una Nueva Plataforma</h2>
+<p><strong>1. Actualizar <code>utils/platforms.py</code></strong></p>
+<pre><code class="language-python">TIKTOK_DOMAINS: frozenset[str] = frozenset({&quot;tiktok.com&quot;, &quot;www.tiktok.com&quot;})
+
+PLATFORM_DOMAINS = {
+    &quot;facebook&quot;:  FACEBOOK_DOMAINS,
+    &quot;instagram&quot;: INSTAGRAM_DOMAINS,
+    &quot;tiktok&quot;:    TIKTOK_DOMAINS,
+}
+</code></pre>
+<p><strong>2. Crear el scraper</strong></p>
+<pre><code class="language-python"># src/reaper/scrapers/tiktok.py
+from reaper.scrapers.base import BaseScraper
+from reaper.utils.logger import get_logger
+logger = get_logger(__name__)
+
+class TiktokScraper(BaseScraper):
+    async def run(self) -&gt; dict[str, Any]:
+        fetch_result = await self._fetch()
+        # ... lógica de scraping
+</code></pre>
+<p><strong>3. Registrar en <code>core.py</code></strong></p>
+<pre><code class="language-python">match platform:
+    case &quot;facebook&quot;:  ...
+    case &quot;instagram&quot;: ...
+    case &quot;tiktok&quot;:
+        from reaper.scrapers.tiktok import TiktokScraper
+        scraper = TiktokScraper(config)
+    case _:
+        raise UnsupportedPlatformError(...)
+</code></pre>
+<hr />
+<h2 id="17-herramientas-de-desarrollo">17. Herramientas de Desarrollo</h2>
+<h3 id="tests">Tests</h3>
+<pre><code class="language-bash">pytest                              # todos los tests
+pytest -v                           # verbose
+pytest tests/test_reaper.py -v      # un fichero
+pytest -k &quot;proxy&quot; -v                # filtrar por nombre
+pytest --tb=short                   # traceback corto
+</code></pre>
+<h3 id="linting-y-tipos">Linting y tipos</h3>
+<pre><code class="language-bash">ruff check src/                     # detectar problemas
+ruff check src/ --fix               # corregir automáticamente
+ruff format src/                    # formatear código
+
+mypy src/                           # verificación de tipos estática
+</code></pre>
+<h3 id="configuracion-de-herramientas-pyprojecttoml">Configuración de herramientas (<code>pyproject.toml</code>)</h3>
+<pre><code class="language-toml">[tool.ruff]
+line-length    = 100
+target-version = &quot;py311&quot;
+
+[tool.ruff.lint]
+select = [&quot;E&quot;, &quot;F&quot;, &quot;I&quot;, &quot;N&quot;, &quot;W&quot;, &quot;UP&quot;]
+
+[tool.mypy]
+python_version         = &quot;3.11&quot;
+strict                 = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = &quot;auto&quot;
+testpaths    = [&quot;tests&quot;]
+</code></pre>
+<hr />
+<h2 id="18-decisiones-de-diseno">18. Decisiones de Diseño</h2>
+<h3 id="por-que-selfresult-se-inicializa-en-baseparser">Por qué <code>self.result</code> se inicializa en <code>BaseParser</code></h3>
+<p>Los campos garantizados (<code>platform</code>, <code>status</code>, <code>error</code>, <code>raw_data_available</code>, <code>scraped_at</code>, <code>final_url</code>, <code>post_url</code>) deben existir en <strong>todos</strong> los resultados, incluso en los de error. Inicializarlos en <code>BaseParser.__init__</code> garantiza esto independientemente de qué subclase se use o si <code>parse()</code> falla.</p>
+<p>Cada subclase añade solo sus campos específicos con <code>self.result.update({...})</code>.</p>
+<h3 id="por-que-los-parsers-de-facebook-buscan-en-el-html-y-no-solo-en-el-trafico">Por qué los parsers de Facebook buscan en el HTML y no solo en el tráfico</h3>
+<p>Facebook sirve los datos iniciales embebidos en el HTML como bloques <code>&lt;script type="application/json"&gt;</code>. El tráfico GraphQL complementa estos datos con paginación y comentarios adicionales. Los parsers usan el HTML como fuente primaria y el tráfico como enriquecimiento.</p>
+<h3 id="por-que-get_parser_from_fb_url-no-hace-fetch">Por qué <code>get_parser_from_fb_url</code> no hace fetch</h3>
+<p>El clasificador es determinista y funciona offline. Hacer un fetch para determinar el tipo de contenido añadiría latencia innecesaria y una dependencia de red. En los pocos casos donde el parser primario no encuentra datos, el <code>_FALLBACK_PARSER_MAP</code> del scraper maneja la situación.</p>
+<h3 id="por-que-el-merge-reelvideo">Por qué el merge reel↔video</h3>
+<p>Facebook sirve Reels y Vídeos como dos tipos de contenido distintos con HTML diferentes. Un Reel tiene datos de engagement y texto pero carece de URLs de descarga. Un Vídeo tiene URLs de descarga pero puede carecer de algunos metadatos de Reel. El merge combina lo mejor de ambos.</p>
+<h3 id="por-que-logginggetlogger__name__-se-envuelve-en-get_logger">Por qué <code>logging.getLogger(__name__)</code> se envuelve en <code>get_logger()</code></h3>
+<p><code>get_logger()</code> es funcionalmente idéntico a <code>logging.getLogger()</code>. El valor es semántico: todos los módulos importan desde un único punto (<code>reaper.utils.logger</code>), lo que facilita añadir funcionalidad futura (logging estructurado, contexto extra) sin modificar 20 archivos.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "toc.integrate", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
