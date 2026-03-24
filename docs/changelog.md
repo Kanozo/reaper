@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.2.2
+
+### Nuevas funcionalidades
+
+- **Reintento automático al detectar muro de autenticación** en `FacebookScraper` e `InstagramScraper`:
+
+  Cuando `requires_auth()` detecta un muro de login en el HTML, el scraper
+  ya no devuelve error inmediatamente. En su lugar aplica esta lógica:
+
+  - **Fetch anónimo + muro**: si hay `AccountManager` con cuentas disponibles,
+    reintenta automáticamente con una cuenta autenticada.
+  - **Fetch autenticado + muro**: las cookies de la cuenta activa han sido
+    invalidadas por la plataforma. La cuenta se marca como `COOKIE_EXPIRED`
+    y se reintenta con una cuenta diferente del pool.
+  - **Sin posibilidad de retry** (sin manager, sin cuentas, o segundo muro):
+    retorna error. Máximo 1 reintento por petición.
+
+- `InstagramScraper` añade detección de muro de autenticación via `requires_auth()`
+  (no existía en versiones anteriores).
+
+### Archivos modificados
+
+- `src/reaper/scrapers/facebook.py` — métodos `_handle_auth_wall()`, `_retry_with_account()`
+- `src/reaper/scrapers/instagram.py` — mismos métodos + import de `requires_auth`
+
+---
+
 ## 0.2.1
 
 ### Nuevas funcionalidades

@@ -3,23 +3,30 @@ reaper/scrapers/facebook.py
 ===========================
 Scraper de orquestación para todo el contenido de Facebook.
 
-Este módulo no cambia su lógica de parseo ni de merge reel↔video.
-Los únicos cambios respecto a la versión anónima son:
+Flujo de reintento por muro de autenticación
+---------------------------------------------
+Cuando se detecta un muro de autenticación en el HTML recibido, el scraper
+distingue dos escenarios:
 
-1. ``run()`` llama a ``_fetch_with_account("facebook")`` en lugar de
-   ``_fetch()`` directamente, activando la rotación de cuentas si
-   ``config.account_manager`` está configurado.
+1. **Fetch era anónimo** (sin cuenta activa):
+   Si hay un ``AccountManager`` con cuentas disponibles, reintenta
+   automáticamente usando ``_fetch_with_account()``. El retry es transparente
+   para el caller: si tiene éxito se continúa el parseo normalmente.
 
-2. ``_fetch()`` acepta el parámetro ``cookies`` y lo pasa al
-   ``ContentFetcher`` para inyectarlas antes de navegar.
+2. **Fetch ya estaba autenticado** (``_active_account_id`` asignado):
+   Las cookies de esa cuenta han caducado o fueron invalidadas por Facebook.
+   Se marca la cuenta como ``COOKIE_EXPIRED`` para excluirla del rotador
+   y se reintenta con una cuenta diferente. Si no hay más cuentas disponibles,
+   se retorna error.
 
-Los fetches secundarios (merge reel↔video, álbum) siguen usando ``_fetch()``
-directamente porque son parte de la misma sesión y no necesitan cambiar de cuenta.
+En ambos casos, si el reintento también devuelve muro de autenticación,
+se retorna el error sin seguir intentando (máximo 1 retry por petición).
 """
 
 from datetime import datetime
 from typing import Any
 
+from reaper.auth.models import AccountStatus
 from reaper.network.content_fetcher import ContentFetcher
 from reaper.parsers import (
     GroupParser,
@@ -97,16 +104,23 @@ class FacebookScraper(BaseScraper):
     """Scraper para todo tipo de contenido de Facebook.
 
     Soporta: posts, reels, vídeos, fotos, grupos y perfiles.
-    Con AccountManager: selecciona automáticamente la mejor cuenta disponible.
+
+    Con AccountManager:
+        - Selecciona automáticamente la mejor cuenta disponible.
+        - Si la respuesta anónima choca con un muro de auth, reintenta
+          automáticamente con una cuenta autenticada.
+        - Si la respuesta autenticada choca con un muro de auth, marca
+          las cookies de esa cuenta como expiradas y reintenta con otra.
+
     Sin AccountManager: opera en modo anónimo (comportamiento original).
     """
 
     async def run(self) -> dict[str, Any]:
         logger.info("Iniciando extracción Facebook | url=%s", self.config.url)
 
-        # ── Fetch primario (con rotación de cuentas si está configurada) ──────
-        # _fetch_with_account() selecciona la mejor cuenta, inyecta sus cookies
-        # y registra el resultado. Si no hay AccountManager, es un _fetch() normal.
+        # ── Fetch primario ────────────────────────────────────────────────────
+        # _fetch_with_account() usa una cuenta si hay AccountManager,
+        # o hace una petición anónima si no.
         fetch_result = await self._fetch_with_account("facebook")
 
         if not fetch_result.success:
@@ -119,13 +133,16 @@ class FacebookScraper(BaseScraper):
         # ── Detección de muro de autenticación ───────────────────────────────
         auth = requires_auth(fetch_result.html_content, final_url)
         if auth.requires_auth:
-            logger.warning(
-                "Autenticación requerida | reason=%s | url=%s", auth.reason, final_url
-            )
-            return self._error_result(
-                f"Authentication required — {auth.reason}",
-                final_url=final_url,
-            )
+            # Intentar recuperarse con o sin cuenta según el contexto.
+            fetch_result = await self._handle_auth_wall(auth.reason, final_url)
+            if fetch_result is None:
+                # Sin posibilidad de reintento: retornar error.
+                return self._error_result(
+                    f"Authentication required — {auth.reason}",
+                    final_url=final_url,
+                )
+            # Reintento exitoso: actualizar final_url y continuar el flujo.
+            final_url = fetch_result.final_url or final_url
 
         # ── Selección de parser ───────────────────────────────────────────────
         parser_name   = get_parser_from_fb_url(final_url)
@@ -152,9 +169,6 @@ class FacebookScraper(BaseScraper):
         ).parse()
 
         # ── Lógica de merge / re-fetch por tipo ───────────────────────────────
-        # Los fetches secundarios usan _fetch() directamente (misma sesión,
-        # no necesitan cambiar de cuenta).
-
         if result.get("__typename") == "facebook_photo":
             parent_post_url = result.get("parent_post_url")
             if result.get("is_album") and result.get("permalink_url") != parent_post_url:
@@ -170,8 +184,6 @@ class FacebookScraper(BaseScraper):
 
         elif result.get("__typename") == "facebook_video":
             reel_url  = result.get("permalink_url", self.config.url)
-            if "reel" not in reel_url:
-                reel_url = f"https://www.facebook.com/reel/{result.get('id')}"
             new_fetch = await self._fetch(override_url=reel_url)
             if new_fetch.success:
                 new_result = ReelParser(
@@ -242,6 +254,132 @@ class FacebookScraper(BaseScraper):
         return self._enrich_with_traffic(result, fetch_result)
 
     # ──────────────────────────────────────────────────────────────────────────
+    # Manejo del muro de autenticación
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def _handle_auth_wall(
+        self,
+        reason: str | None,
+        final_url: str,
+    ):
+        """Gestiona un muro de autenticación detectado en el HTML.
+
+        Diferencia dos escenarios y actúa en consecuencia:
+
+        **Escenario A — fetch previo era anónimo** (``_active_account_id`` es None):
+            Si hay un ``AccountManager`` con cuentas disponibles para Facebook,
+            reintenta la petición con una cuenta autenticada. Si no hay
+            ``AccountManager`` o no hay cuentas, retorna ``None``.
+
+        **Escenario B — fetch previo ya estaba autenticado**:
+            Las cookies de la cuenta activa han caducado o fueron invalidadas
+            por Facebook. Se marca la cuenta como ``COOKIE_EXPIRED`` para
+            excluirla del rotador permanentemente hasta que se refresquen sus
+            cookies. Luego se reintenta con una cuenta diferente.
+
+        En ambos escenarios, si el reintento también devuelve muro de
+        autenticación, se retorna ``None`` para que el caller emita el error.
+        No se realizan más de un reintento para no entrar en bucles.
+
+        Args:
+            reason:    Motivo del muro detectado por ``requires_auth()``.
+            final_url: URL final de la petición original (para logging).
+
+        Returns:
+            Nuevo ``FetchResult`` exitoso y sin muro de auth, o ``None`` si
+            no fue posible recuperarse.
+        """
+        manager = self.config.account_manager
+
+        # ── Escenario A: fetch anónimo ────────────────────────────────────────
+        if self._active_account_id is None:
+            if manager is None:
+                logger.warning(
+                    "Muro de auth en fetch anónimo | reason=%s | "
+                    "sin AccountManager — no es posible reintentar | url=%s",
+                    reason, final_url,
+                )
+                return None
+
+            logger.info(
+                "Muro de auth en fetch anónimo | reason=%s | "
+                "reintentando con cuenta autenticada | url=%s",
+                reason, final_url,
+            )
+            return await self._retry_with_account(reason, final_url)
+
+        # ── Escenario B: fetch ya autenticado → cookies expiradas ─────────────
+        expired_account_id = self._active_account_id
+        logger.warning(
+            "Muro de auth con cuenta autenticada — cookies expiradas | "
+            "account_id=%s | reason=%s | url=%s",
+            expired_account_id, reason, final_url,
+        )
+
+        # Marcar la cuenta como COOKIE_EXPIRED para excluirla del rotador.
+        await manager.update_status(
+            account_id=expired_account_id,
+            status=AccountStatus.COOKIE_EXPIRED,
+            notes=(
+                f"Cookies invalidadas por Facebook durante scraping. "
+                f"Muro detectado: {reason}. "
+                f"URL: {final_url}"
+            ),
+        )
+
+        # Resetear la cuenta activa para que el retry pueda elegir otra.
+        self._active_account_id = None
+
+        logger.info(
+            "Cuenta marcada COOKIE_EXPIRED | account_id=%s | "
+            "reintentando con cuenta diferente | url=%s",
+            expired_account_id, final_url,
+        )
+        return await self._retry_with_account(reason, final_url)
+
+    async def _retry_with_account(
+        self,
+        original_reason: str | None,
+        final_url: str,
+    ):
+        """Reintenta el fetch con una cuenta autenticada y verifica el resultado.
+
+        Args:
+            original_reason: Motivo del muro original (para logging).
+            final_url:       URL final para el log en caso de segundo muro.
+
+        Returns:
+            ``FetchResult`` si el reintento tuvo éxito y sin muro de auth.
+            ``None`` si el reintento falló, el HTML estaba vacío, o el
+            reintento también devolvió muro de autenticación.
+        """
+        retry_result = await self._fetch_with_account("facebook")
+
+        if not retry_result.success:
+            logger.warning(
+                "Reintento autenticado fallido | error=%s | url=%s",
+                retry_result.error, final_url,
+            )
+            return None
+
+        # Comprobar si el reintento también devuelve muro de auth.
+        retry_final_url = retry_result.final_url or self.config.url
+        retry_auth = requires_auth(retry_result.html_content, retry_final_url)
+
+        if retry_auth.requires_auth:
+            logger.warning(
+                "Reintento autenticado también bloqueado | "
+                "reason_original=%s | reason_retry=%s | url=%s",
+                original_reason, retry_auth.reason, final_url,
+            )
+            return None
+
+        logger.info(
+            "Reintento autenticado exitoso | url=%s", retry_final_url
+        )
+        return retry_result
+
+    # ──────────────────────────────────────────────────────────────────────────
     # Fetch
     # ──────────────────────────────────────────────────────────────────────────
 
@@ -249,13 +387,12 @@ class FacebookScraper(BaseScraper):
         self,
         override_url: str | None = None,
         cookies: list[dict[str, Any]] | None = None,
-    ):
+    ) -> Any:
         """Crea un ContentFetcher y ejecuta la navegación.
 
         Args:
             override_url: URL alternativa (fetches secundarios de merge).
             cookies:      Cookies de sesión a inyectar antes de navegar.
-                          ``None`` = sin cookies (modo anónimo).
         """
         url = override_url or self.config.url
         fetcher = ContentFetcher(
@@ -278,7 +415,7 @@ class FacebookScraper(BaseScraper):
     # ──────────────────────────────────────────────────────────────────────────
 
     def _enrich_with_traffic(
-        self, result: dict[str, Any], fetch_result
+        self, result: dict[str, Any], fetch_result: Any
     ) -> dict[str, Any]:
         result["graphql_responses_count"] = (
             len(fetch_result.traffic.graphql_responses) if fetch_result.traffic else 0
