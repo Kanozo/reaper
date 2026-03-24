@@ -184,6 +184,8 @@ class FacebookScraper(BaseScraper):
 
         elif result.get("__typename") == "facebook_video":
             reel_url  = result.get("permalink_url", self.config.url)
+            if "reel" not in reel_url:
+                reel_url = f"https://www.facebook.com/reel/{result.get('id')}"
             new_fetch = await self._fetch(override_url=reel_url)
             if new_fetch.success:
                 new_result = ReelParser(
@@ -201,20 +203,21 @@ class FacebookScraper(BaseScraper):
         elif result.get("__typename") == "facebook_reel":
             reel_attachments = result.get("attachments") or []
             reel_video_id = reel_attachments[0].get("id") if reel_attachments else ""
-            video_url = f"https://www.facebook.com/watch/?v={reel_video_id}"
-            new_fetch = await self._fetch(override_url=video_url)
-            if new_fetch.success:
-                new_result = VideoParser(
-                    html_content=new_fetch.html_content,
-                    final_url=new_fetch.final_url,
-                    original_url=video_url,
-                    traffic=new_fetch.traffic,
-                    debug=self.config.debug,
-                ).parse()
-                result = self._merge_video_into_reel(
-                    reel_result=result,
-                    video_result=new_result,
-                )
+            if reel_video_id:
+                video_url = f"https://www.facebook.com/watch/?v={reel_video_id}"
+                new_fetch = await self._fetch(override_url=video_url)
+                if new_fetch.success:
+                    new_result = VideoParser(
+                        html_content=new_fetch.html_content,
+                        final_url=new_fetch.final_url,
+                        original_url=video_url,
+                        traffic=new_fetch.traffic,
+                        debug=self.config.debug,
+                    ).parse()
+                    result = self._merge_video_into_reel(
+                        reel_result=result,
+                        video_result=new_result,
+                    )
 
         # ── Resultado con datos ───────────────────────────────────────────────
         if result.get("raw_data_available"):
