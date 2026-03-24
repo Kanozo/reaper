@@ -1415,7 +1415,8 @@
         <p>Clase base abstracta para scrapers de plataforma.</p>
 <p>Las subclases deben implementar <code>run()</code> y <code>_fetch()</code>.
 El método <code>_fetch_with_account()</code> está implementado aquí y es el punto
-de entrada principal para fetches que requieren rotación de cuentas.</p>
+de entrada principal para fetches que requieren rotación de cuentas y
+refresco automático de cookies.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1646,7 +1647,27 @@ de entrada principal para fetches que requieren rotación de cuentas.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>FetchResult</code> con HTML renderizado, tráfico y metadatos.</p>
+                <p><code>FetchResult</code> con HTML renderizado, tráfico, metadatos y</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>updated_cookies</code> con las cookies post-navegación si la</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>sesión era autenticada.</p>
               </div>
             </td>
           </tr>
@@ -1677,18 +1698,21 @@ de entrada principal para fetches que requieren rotación de cuentas.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Fetch con selección automática de cuenta autenticada (si disponible).</p>
-<p>Este método es el punto de entrada principal para el primer fetch de
-cada sesión de scraping. Coordina:</p>
+        <p>Fetch con selección de cuenta, registro de actividad y auto-refresh.</p>
+<p>Coordina el flujo completo de una petición autenticada:</p>
 <ol>
 <li>Consulta al <code>AccountManager</code> por la mejor cuenta disponible.</li>
-<li>Lectura de cookies de disco para esa cuenta.</li>
-<li>Fetch con cookies inyectadas.</li>
-<li>Registro del resultado (éxito/fallo) en la actividad de la cuenta.</li>
+<li>Lee las cookies de disco para esa cuenta.</li>
+<li>Ejecuta el fetch con las cookies inyectadas en el contexto Playwright.</li>
+<li>Registra éxito o fallo en la actividad de la cuenta.</li>
+<li>Si el fetch fue exitoso, compara las cookies originales con las
+   devueltas por el servidor post-navegación. Si difieren, las persiste
+   automáticamente — el servidor habrá extendido TTLs o rotado tokens
+   de seguridad, alargando la vida de la sesión.</li>
 </ol>
 <p>Si <code>config.account_manager</code> es <code>None</code>, o si no hay cuentas
-disponibles para la plataforma, delega en <code>_fetch()</code> directamente
-en modo anónimo. Este fallback garantiza compatibilidad total hacia atrás.</p>
+disponibles, delega en <code>_fetch()</code> directamente en modo anónimo.
+Este fallback garantiza compatibilidad total hacia atrás.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>

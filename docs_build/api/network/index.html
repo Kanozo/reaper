@@ -2094,7 +2094,8 @@ fetcher = ContentFetcher(url, config=cfg)
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">authenticated</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">account_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">debug_session_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">updated_cookies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents first">
@@ -2228,6 +2229,25 @@ En caso de error, <code>success=False</code> y <code>error</code> describe el fa
             <td>
               <div class="doc-md-description">
                 <p>Path al directorio de debug. None si debug=False.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="reaper.network.interceptor.FetchResult.updated_cookies">updated_cookies</span></code></td>
+            <td>
+                  <code><span title="list">list</span>[<span title="dict">dict</span>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Cookies leídas del contexto Playwright después de
+               la navegación. El servidor puede haber emitido
+               cabeceras <code>Set-Cookie</code> que extienden el TTL o
+               rotan tokens de seguridad de corta vida.
+               <code>BaseScraper._fetch_with_account()</code> compara este
+               campo con las cookies originales y persiste las
+               actualizadas si difieren, alargando automáticamente
+               la vida de la sesión sin necesidad de login manual.
+               <code>None</code> en sesiones anónimas o si la lectura falló.</p>
               </div>
             </td>
           </tr>

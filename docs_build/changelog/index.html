@@ -1191,6 +1191,56 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#021" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.1
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.1">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nuevas-funcionalidades" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nuevas funcionalidades
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#comportamiento-del-cookie_refresh_threshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comportamiento del cookie_refresh_threshold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archivos-modificados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archivos modificados
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#020" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1203,7 +1253,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#nuevas-funcionalidades" class="md-nav__link">
+  <a href="#nuevas-funcionalidades_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Nuevas funcionalidades
@@ -1286,6 +1336,56 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#021" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.1
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.1">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nuevas-funcionalidades" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nuevas funcionalidades
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#comportamiento-del-cookie_refresh_threshold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comportamiento del cookie_refresh_threshold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archivos-modificados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archivos modificados
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#020" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1298,7 +1398,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#nuevas-funcionalidades" class="md-nav__link">
+  <a href="#nuevas-funcionalidades_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Nuevas funcionalidades
@@ -1364,8 +1464,38 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
-<h2 id="020">0.2.0<a class="headerlink" href="#020" title="Permanent link">&para;</a></h2>
+<h2 id="021">0.2.1<a class="headerlink" href="#021" title="Permanent link">&para;</a></h2>
 <h3 id="nuevas-funcionalidades">Nuevas funcionalidades<a class="headerlink" href="#nuevas-funcionalidades" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Refresco automático de cookies</strong> sin intervención manual:</li>
+<li><code>FetchResult</code> añade el campo <code>updated_cookies</code>: cookies leídas del
+    contexto Playwright tras la navegación. El servidor emite <code>Set-Cookie</code>
+    en cada respuesta que actualiza tokens de seguridad y extiende TTLs.</li>
+<li><code>ContentFetcher.fetch()</code> lee <code>context.cookies()</code> post-navegación cuando
+    la sesión es autenticada y lo expone en <code>FetchResult.updated_cookies</code>.</li>
+<li><code>BaseScraper._fetch_with_account()</code> compara las cookies originales con
+    las actualizadas vía <code>_cookies_differ()</code> y llama a <code>manager.import_cookies()</code>
+    si difieren, persistiendo la sesión renovada en disco automáticamente.</li>
+<li><code>_cookies_differ()</code> — helper privado que compara <code>value</code> y <code>expires</code>
+    por nombre de cookie, ignorando metadatos irrelevantes.</li>
+</ul>
+<h3 id="comportamiento-del-cookie_refresh_threshold">Comportamiento del <code>cookie_refresh_threshold</code><a class="headerlink" href="#comportamiento-del-cookie_refresh_threshold" title="Permanent link">&para;</a></h3>
+<p>El threshold pasa de señal principal a <strong>safety net</strong>. Con el auto-refresh
+activo, <code>requests_since_cookie_refresh</code> se resetea a 0 después de cada
+petición donde el servidor devuelva cookies actualizadas. El WARNING
+<code>NEEDS_REFRESH</code> solo aparece si el servidor no emite <code>Set-Cookie</code> durante
+N peticiones consecutivas — caso inusual que requiere intervención manual.</p>
+<h3 id="archivos-modificados">Archivos modificados<a class="headerlink" href="#archivos-modificados" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>src/reaper/network/interceptor.py</code> — campo <code>updated_cookies</code> en <code>FetchResult</code></li>
+<li><code>src/reaper/network/content_fetcher.py</code> — captura de cookies post-navegación</li>
+<li><code>src/reaper/scrapers/base.py</code> — lógica de auto-refresh y <code>_cookies_differ()</code></li>
+<li><code>docs/technical/auth.md</code> — documentación del mecanismo de auto-refresh</li>
+<li><code>docs/user/pool.md</code> — ciclo de vida actualizado con auto-refresh</li>
+</ul>
+<hr />
+<h2 id="020">0.2.0<a class="headerlink" href="#020" title="Permanent link">&para;</a></h2>
+<h3 id="nuevas-funcionalidades_1">Nuevas funcionalidades<a class="headerlink" href="#nuevas-funcionalidades_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Sistema de cuentas autenticadas</strong> (<code>reaper.auth</code>):</li>
 <li><code>AccountManager</code> — gestor central de cuentas con CRUD completo.</li>
