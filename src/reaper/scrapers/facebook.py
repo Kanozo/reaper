@@ -191,7 +191,7 @@ class FacebookScraper(BaseScraper):
                 new_result = ReelParser(
                     html_content=new_fetch.html_content,
                     final_url=new_fetch.final_url,
-                    original_url=reel_url,
+                    original_url=result.get('post_url'),
                     traffic=new_fetch.traffic,
                     debug=self.config.debug,
                 ).parse()
