@@ -736,7 +736,6 @@ class FacebookContentParser(BaseParser):
                 else {}
             )
 
-            # Navegar hasta el story adjunto interno para texto y adjuntos
             story_att = self._safe_get(
                 story,
                 "comet_sections", "content", "story",
@@ -770,12 +769,26 @@ class FacebookContentParser(BaseParser):
                         attachments.append({
                             "type": media.get("__typename"),
                             "id": media.get("id", ""),
-                            "thumbnail_url": self._safe_get(
-                                media, "thumbnailImage", "uri"
-                            ),
+                            "thumbnail_url": self._safe_get(media, "thumbnailImage", "uri"),
                             "url": url,
                             "caption": caption,
                         })
+
+                    # ── Fallback álbum ──────────────────────────────────────────
+                    # El loop anterior solo resuelve Photo/Video directos via
+                    # styles.attachment.media. Para StoryAttachmentAlbumStyleRenderer
+                    # ese campo no existe: las imágenes viven en
+                    # styles.attachment.all_subattachments.nodes.
+                    # _extract_attachments_common ya maneja ese renderer
+                    # correctamente, lo reutilizamos cuando el loop dejó
+                    # attachments vacío.
+                    if not attachments:
+                        logger.debug(
+                            "_extract_shared_post: loop principal sin adjuntos; "
+                            "reintentando con _extract_attachments_common "
+                            "(posible StoryAttachmentAlbumStyleRenderer)."
+                        )
+                        attachments = self._extract_attachments_common(story_att)
 
                 for meta in self._safe_get(story_att, "comet_sections", "metadata", default=[]):
                     ts = self._safe_get(meta, "story", "creation_time")

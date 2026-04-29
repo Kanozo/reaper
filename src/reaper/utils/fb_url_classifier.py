@@ -17,9 +17,10 @@ Reglas de clasificación (en orden de evaluación)::
     /groups/<x>/permalink/<id>                  → PostParser
     /groups/<x>  (sin posts/permalink)          → GroupParser
     /<x>/posts/<id>  (fuera de groups)          → PostParser
+    /<x>/posts/<slug>/<id>                      → PostParser  ← NUEVO
     profile.php?id=<id>                         → ProfileParser
     story.php?story_fbid=  o  permalink.php?story_fbid=  → PostParser
-    permalink.php?id=<id>  (sin story_fbid)    → PostParser   ← NUEVO
+    permalink.php?id=<id>  (sin story_fbid)    → PostParser
     share/r/<id>                                → ReelParser
     share/p/<id>                                → PostParser
     share/v/<id>                                → ReelParser
@@ -28,7 +29,7 @@ Reglas de clasificación (en orden de evaluación)::
     /<vanity>  (slug sin prefijos conocidos)    → ProfileParser
     Cualquier otro caso                         → UnknownParser
 
-Python: 3.11+
+Python: 3.13+
 """
 import re
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -92,6 +93,11 @@ def get_parser_from_fb_url(url: str) -> str:
         'GroupParser'
         >>> get_parser_from_fb_url("https://www.facebook.com/zurdobo7")
         'ProfileParser'
+        >>> get_parser_from_fb_url(
+        ...     "https://www.facebook.com/NoticiasTelemundo/posts/"
+        ...     "-liveblog-l-la-casa-blanca/1532119218279349/"
+        ... )
+        'PostParser'
     """
     path, query = _normalize_url(url)
 
@@ -108,9 +114,6 @@ def get_parser_from_fb_url(url: str) -> str:
     #   /<user>/videos/<id>/
     #   /<user>/videos/<slug>/<id>/     ← slug opcional entre user e id
     #   ?v=<id>
-    #
-    # CORRECCIÓN: eliminada la regla duplicada que existía antes
-    # (dos bloques if con casi el mismo patrón — dead code innecesario).
     if (
         re.search(r"/videos/(?:[^/]+/)*\d+", path, re.I)
         or re.search(r"(?:^|&)v=\d+", query)
@@ -118,9 +121,6 @@ def get_parser_from_fb_url(url: str) -> str:
         return "VideoParser"
 
     # ── Regla 4: Foto individual (photo.php o /photo/) ───────────────────────
-    # Todas las variantes de visor de foto individual van a PhotoParser,
-    # que tiene lógica específica para la arquitectura de datos del visor.
-    #
     # photo.php?fbid=<id>       → visor clásico
     # /photo/?fbid=<id>         → variante moderna
     # /<user>/photos/<id>/      → foto en álbum
@@ -138,8 +138,16 @@ def get_parser_from_fb_url(url: str) -> str:
     if re.match(r"^/groups/", path, re.I):
         return "GroupParser"
 
-    # ── Regla 7: Post directo (/<x>/posts/<id>) ──────────────────────────────
-    if re.search(r"/posts/(?:\d+|pfbid[A-Za-z0-9]+)", path, re.I):
+    # ── Regla 7: Post directo ────────────────────────────────────────────────
+    # Cubre tres variantes:
+    #   /<page>/posts/<id_numérico>/
+    #   /<page>/posts/pfbid<alfanumérico>/
+    #   /<page>/posts/<slug_textual>/<id_numérico>/   ← AÑADIDO
+    #
+    # CORRECCIÓN: la tercera alternativa ([^/]+/\d+) resuelve el caso donde
+    # Facebook incluye un slug descriptivo entre /posts/ y el ID numérico,
+    # p.ej. /NoticiasTelemundo/posts/-liveblog-.../1532119218279349/
+    if re.search(r"/posts/(?:\d+|pfbid[A-Za-z0-9]+|[^/]+/\d+)", path, re.I):
         return "PostParser"
 
     # ── Regla 8: Perfil numérico (profile.php?id=<id>) ───────────────────────
@@ -147,18 +155,12 @@ def get_parser_from_fb_url(url: str) -> str:
         return "ProfileParser"
 
     # ── Regla 9: permalink.php o story.php ───────────────────────────────────
-    # Cubre dos subasos:
-    #   A) ?story_fbid=<id>  → post identificado por story_fbid
-    #      (funciona tanto con IDs numéricos como con el nuevo formato pfbid...)
-    #   B) ?id=<id> sin story_fbid → también es un post (permalink genérico)
-    #
-    # CORRECCIÓN (subcaso B): antes, permalink.php?id=<id> sin story_fbid
-    # caía a UnknownParser porque Rule 9 solo comprobaba story_fbid.
+    # A) ?story_fbid=<id>  → post identificado por story_fbid
+    # B) ?id=<id> sin story_fbid → permalink genérico
     if re.search(r"/(?:story|permalink)\.php", path, re.I):
         if re.search(r"story_fbid=", query):
             return "PostParser"
         if re.search(r"(?:^|&)id=\d+", query):
-            # permalink.php?id=<id> sin story_fbid → también es un post
             return "PostParser"
 
     # ── Reglas 10–13: Shortlinks share/* ─────────────────────────────────────
@@ -167,10 +169,8 @@ def get_parser_from_fb_url(url: str) -> str:
     if re.match(r"^/share/p/", path, re.I):
         return "PostParser"
     if re.match(r"^/share/v/", path, re.I):
-        # /v/ es mayoritariamente reel; fallback VideoParser si falla
         return "ReelParser"
     if re.match(r"^/share/", path, re.I):
-        # sin sufijo: mayoritariamente posts; fallback ReelParser si falla
         return "PostParser"
 
     # ── Regla 14: Perfil /people/<nombre>/<id_numérico>/ ─────────────────────
@@ -212,3 +212,5 @@ def _normalize_url(url: str) -> tuple[str, str]:
         return parsed.path or "/", urlencode(clean, doseq=True)
     except Exception:
         return "/", ""
+    
+#print (get_parser_from_fb_url("https://www.facebook.com/NoticiasTelemundo/posts/-liveblog-l-la-casa-blanca-afirma-que-quienes-creen-en-las-teor%C3%ADas-de-conspiraci/1532119218279349/"))

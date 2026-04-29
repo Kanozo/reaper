@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.2.3
+
+### Nuevas funcionalidades
+
+- **Detección de contenido no disponible** en `FacebookScraper` y `fb_auth_detector`:
+
+  Hasta esta versión, las páginas de Facebook donde el contenido ha sido eliminado
+  o restringido permanentemente eran detectadas como muros de autenticación
+  (`auth_type="error_route"`), provocando reintentos inútiles con cuentas del pool.
+  Autenticarse no resuelve este caso porque el contenido no existe para nadie.
+
+  La detección ahora distingue ambos casos antes de evaluar si hay muro de login:
+
+  - **`content_unavailable`** — nuevo `auth_type`. Facebook muestra este estado
+    cuando el contenido fue eliminado, era privado para un grupo reducido, o el
+    propietario cambió la privacidad. Señales detectadas en el bloque JSON de
+    bootstrap del HTML renderizado:
+    - Título `"This content isn't available right now"` en los props del `rootView`.
+    - Texto del cuerpo del error con referencias a "deleted" o "small group".
+
+  - **Sin reintento**: cuando se detecta `content_unavailable`, `FacebookScraper`
+    retorna inmediatamente con `status="content_unavailable"` sin consultar al
+    `AccountManager` ni consumir cuentas del pool.
+
+- **Nuevo `status` en el resultado**: `"content_unavailable"` permite que el caller
+  distinga este caso de un error técnico (`"error"`) o de un muro de autenticación
+  no recuperable, y tome decisiones informadas (e.g. marcar el contenido como
+  eliminado en su sistema).
+
+- **Nuevo método `FacebookScraper._content_unavailable_result()`**: helper análogo
+  a `_error_result()` que emite el dict con `status="content_unavailable"` y
+  `error="Content not available — deleted or restricted"`.
+
+### Archivos modificados
+
+- `src/reaper/utils/fb_auth_detector.py` — constante `_CONTENT_UNAVAILABLE` + capa 1b en `requires_auth()`
+- `src/reaper/scrapers/facebook.py` — guardia `content_unavailable` en `run()` + método `_content_unavailable_result()`
+
+---
+
 ## 0.2.2
 
 ### Nuevas funcionalidades

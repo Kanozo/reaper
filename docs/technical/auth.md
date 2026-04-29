@@ -81,6 +81,97 @@ completa está en [api/auth.md](../api/auth.md#accountmanager).
 backends de BD pueden implementarla como un `UPDATE` parcial.
 `save()` es para cambios de estado completos, que ocurren raramente.
 
+## Detección de contenido no disponible
+
+### El problema: falso positivo en `error_route`
+
+Cuando Facebook no puede servir un contenido (eliminado, privado, restringido),
+renderiza una página de error con `"tracePolicy":"comet.error"` en los bloques
+JSON de bootstrap. Esta señal es la misma que emite cuando el usuario necesita
+autenticarse para ver contenido restringido.
+
+Sin distinción entre ambos casos, el scraper reintentaba con cuentas del pool
+ante cualquier `error_route` — un reintento costoso e inútil cuando el contenido
+simplemente no existe para nadie.
+
+### Señales específicas de `content_unavailable`
+
+Facebook incluye en los props del `rootView` un mensaje de error específico
+que solo aparece en páginas de contenido no disponible, no en muros de login:
+
+```json
+{
+  "rootView": {
+    "props": {
+      "title": "This content isn't available right now",
+      "body": "When this happens, it's usually because the owner only shared it with\n        a small group of people, changed who can see it or it's been deleted.",
+      "privacy": true
+    }
+  }
+}
+```
+
+El muro de login genuino nunca incluye este `title` — muestra el formulario
+de credenciales directamente o redirige a `/login`.
+
+### Implementación: capa 1b en `requires_auth()`
+
+La detección se inserta entre la comprobación de contenido presente (capa 1)
+y la comprobación de URL redirigida (capa 2):
+
+```
+requires_auth(html, url)
+    │
+    ├─ Capa 1:  ¿tracePolicy de contenido real?      → False (no bloqueado)
+    │
+    ├─ Capa 1b: ¿título/cuerpo de error específico?  → False, auth_type="content_unavailable"
+    │               (contenido eliminado/restringido)
+    │
+    ├─ Capa 2:  ¿URL redirigida a /login?            → True, auth_type="login_redirect"
+    │
+    ├─ Capa 3:  ¿tracePolicy=comet.error / CometErrorRoute?  → True, auth_type="error_route"
+    │
+    └─ Capa 4:  ¿CometErrorRoot + privacy=true?      → True, auth_type="privacy_wall"
+```
+
+`requires_auth=False` para `content_unavailable` es intencionado: el contenido
+existe pero no es accesible. No es un muro que se pueda superar autenticándose.
+
+### Comportamiento en `FacebookScraper.run()`
+
+```python
+auth = requires_auth(fetch_result.html_content, final_url)
+
+if auth.auth_type == "content_unavailable":
+    # Retorno inmediato — sin tocar el pool de cuentas
+    return self._content_unavailable_result(final_url)
+
+if auth.requires_auth:
+    # Flujo de reintento normal (autenticación/cookies)
+    ...
+```
+
+### Nuevo `status` en el resultado
+
+```python
+{
+    "platform":           "facebook",
+    "status":             "content_unavailable",   # ← distinguible de "error"
+    "error":              "Content not available — deleted or restricted",
+    "raw_data_available": False,
+    "final_url":          "https://www.facebook.com/story.php?...",
+    "scraped_at":         datetime(...),
+}
+```
+
+| `status` | Significado |
+|---|---|
+| `"ok"` | Extracción exitosa con datos |
+| `"error"` | Fallo técnico o muro de auth no recuperable |
+| `"content_unavailable"` | Contenido eliminado o inaccesible para todos |
+
+---
+
 ## Refresco automático de cookies
 
 ### Cómo funciona

@@ -396,32 +396,35 @@ class NetworkInterceptor:
         logger.info("─" * 65)
 
     # ------------------------------------------------------------------
-    # Handlers de eventos (privados)
+    # HANDLERS DE EVENTOS (privados)
     # ------------------------------------------------------------------
 
     def _on_request(self, request: Request) -> None:
         """
-        Handler síncrono para cada petición de red.
+        Handler SÍNCRONO invocado por Playwright para cada petición de red.
 
-        Playwright requiere que el listener de ``request`` sea síncrono.
-        Las peticiones no relevantes se descartan con un return temprano.
+        Filtra las peticiones de interés y extrae metadatos GraphQL.
+        No puede usar ``await`` (Playwright requiere handler síncrono para ``request``).
 
         Args:
             request: Objeto Request de Playwright.
         """
         url = request.url
-        category = self._categorize(url)
-        if category is None:
-            return
+        if not self._categorize(url):
+            return  # No es de interés; descartar inmediatamente
 
+        # ── Leer body de la petición de forma segura ──
+        # Usamos post_data_buffer (bytes crudos) para evitar UnicodeDecodeError
+        # que lanza post_data cuando el body contiene bytes non-UTF-8
         post_data_raw: str | None = None
         try:
-            raw_buffer = request.post_data_buffer
+            raw_buffer = request.post_data_buffer  # bytes | None
             if raw_buffer:
                 post_data_raw = raw_buffer.decode("utf-8", errors="replace")
         except Exception:
             post_data_raw = None
 
+        # ── Parsear body ──
         post_data: dict[str, Any] | None = None
         try:
             pd_json = request.post_data_json
@@ -432,99 +435,153 @@ class NetworkInterceptor:
         except Exception:
             post_data = self._safe_parse_json(post_data_raw)
 
+        # ── Extraer metadatos GraphQL ──
         graphql_meta: GraphQLMeta | None = None
-        if category == "graphql" and post_data:
+        if post_data:
             graphql_meta = self._extract_graphql_meta(post_data)
 
+        # ── Almacenar request ──
         captured = CapturedRequest(
             url=url,
             method=request.method,
-            category=category,
+            category="graphql",
             timestamp=datetime.now(),
             post_data_raw=post_data_raw if self.debug else None,
             post_data=post_data,
             headers=dict(request.headers),
             graphql_meta=graphql_meta,
         )
+        self._graphql_requests.append(captured)
 
-        self._store_request(captured, category)
+        # ── Registrar meta para correlación con la response futura ──
+        if graphql_meta:
+            if url not in self._pending_meta:
+                self._pending_meta[url] = []
+            self._pending_meta[url].append(graphql_meta)
+
         self._activity_count += 1
 
         if self.debug:
-            meta_label = (
-                f" [{graphql_meta.friendly_name}]"
-                if graphql_meta and graphql_meta.friendly_name
-                else ""
-            )
-            logger.debug("↑ [%s]%s %s %s", category.upper(), meta_label, request.method, url[:80])
+            op = graphql_meta.friendly_name if graphql_meta else "?"
+            logger.debug(f"  ↑ [GRAPHQL] [{op}] {request.method} {url[:80]}")
+            print(f"  ↑ [GQL] {op}")
 
     async def _on_response(self, response: Response) -> None:
         """
-        Handler asíncrono para cada respuesta de red.
+        Handler ASÍNCRONO invocado por Playwright para cada respuesta de red.
 
-        Lee el body con timeout configurable para no bloquear en respuestas
-        lentas o de streaming.
+        Puede usar ``await`` para leer el body de la respuesta.
+
+        Flujo:
+        1. Verificar que la URL es de interés
+        2. Leer el body con timeout de seguridad
+        3. Parsear como JSON
+        4. Correlacionar con la petición original (para obtener GraphQLMeta)
+        5. Almacenar localmente
+        6. Encolar en AsyncStorageWriter para persistencia
 
         Args:
             response: Objeto Response de Playwright.
         """
         url = response.url
-        category = self._categorize(url)
-        if category is None:
+        if not self._categorize(url):
             return
 
-        body: dict[str, Any] | None = None
-        body_raw: str | None = None
+        body:     dict[str, Any] | None = None
+        body_raw: str | None            = None
 
+        # ── Leer body con timeout ──
         try:
             content_type = response.headers.get("content-type", "")
-            should_read = (
-                "json" in content_type
-                or "javascript" in content_type
-                or category in ("graphql", "api")
-            )
+            should_read  = "json" in content_type or self._categorize(url)
 
             if should_read:
-                # asyncio.timeout() es preferible a asyncio.wait_for() en Python 3.11+.
                 try:
-                    async with asyncio.timeout(self.response_body_timeout):
+                    async with asyncio.timeout(5.0):
                         raw_bytes = await response.body()
                 except asyncio.TimeoutError:
-                    logger.debug("Timeout leyendo body de respuesta: %s", url[:60])
+                    logger.debug(f"Timeout leyendo body de {url[:60]}")
                     raw_bytes = None
 
                 if raw_bytes:
                     body_raw = raw_bytes.decode("utf-8", errors="replace")
+                    # Facebook añade "for(;;);" como guard anti-XSS/CSRF en la
+                    # mayoría de sus respuestas GraphQL. Hay que eliminar este
+                    # prefijo antes de parsear el JSON, de lo contrario
+                    # json.loads() lanza JSONDecodeError y body queda None.
+                    clean = body_raw.lstrip()
+                    if clean.startswith("for(;;);"):
+                        clean = clean[8:]
                     try:
-                        body = json.loads(body_raw)
+                        body = json.loads(clean)
                     except json.JSONDecodeError:
-                        body = None
+                        body = None  # No es JSON (HTML, binario...)
 
         except Exception as exc:
-            logger.debug("Error en response handler (%s): %s", url[:60], exc)
+            logger.debug(f"Error leyendo response body ({url[:60]}): {exc}")
 
+        # ── Correlacionar con meta de la petición ──
+        # NOTA: Facebook hace múltiples requests simultáneas a la misma URL.
+        # La correlación FIFO por URL es frágil porque las responses pueden
+        # llegar en distinto orden al de los requests (latencia variable).
+        # Estrategia defensiva: si el body de la response incluye el doc_id,
+        # intentar correlacionar por doc_id primero; si no, caer en FIFO.
+        request_meta: GraphQLMeta | None = None
+        pending = self._pending_meta.get(url)
+        if pending:
+            # Intentar correlación exacta por doc_id extraído de la response
+            response_doc_id: str | None = None
+            if body and isinstance(body, dict):
+                # Algunos responses incluyen el doc_id en extensions o en la
+                # estructura raíz (varía según la versión de FB)
+                response_doc_id = (
+                    body.get("extensions", {}).get("is_final") and None  # placeholder
+                    or None
+                )
+
+            matched_index: int | None = None
+            if response_doc_id:
+                # Buscar el meta cuyo doc_id coincide con el de la response
+                for i, meta in enumerate(pending):
+                    if meta.doc_id == response_doc_id:
+                        matched_index = i
+                        break
+
+            if matched_index is not None:
+                request_meta = pending.pop(matched_index)
+            else:
+                # Fallback FIFO — tomar el primer meta pendiente
+                request_meta = pending.pop(0)
+
+            if not pending:
+                del self._pending_meta[url]
+
+        # ── Construir CapturedResponse ──
         captured = CapturedResponse(
             url=url,
             status=response.status,
-            category=category,
+            category="graphql",
             timestamp=datetime.now(),
             body=body,
             body_raw=body_raw if self.debug else None,
             headers=dict(response.headers),
+            request_meta=request_meta,
+            # sequence_number se asigna en writer.enqueue()
         )
 
-        self._store_response(captured, category)
+        # ── Almacenar localmente ──
+        self._graphql_responses.append(captured)
         self._activity_count += 1
 
         if self.debug:
-            body_label = f" [body: {len(body_raw)}chars]" if body_raw else " [sin body]"
-            logger.debug(
-                "↓ [%s] %d %s%s",
-                category.upper(),
-                response.status,
-                url[:80],
-                body_label,
-            )
+            op        = captured.operation_name
+            body_info = f"[{len(body_raw)} chars]" if body_raw else "[sin body]"
+            logger.debug(f"  ↓ [GRAPHQL] {response.status} [{op}] {url[:60]} {body_info}")
+            print(f"  ↓ [GQL] {response.status} {op} {body_info}")
+
+        # ── Encolar para persistencia asíncrona ──
+        if self.writer:
+            await self.writer.enqueue(captured)
 
     # ------------------------------------------------------------------
     # Helpers privados

@@ -1,11 +1,23 @@
 """
 utils/fb_auth_detector.py
 =========================
-Detecta si una página de Facebook requiere autenticación o
-si el contenido está bloqueado por privacidad.
+Detecta si una página de Facebook requiere autenticación,
+si el contenido está bloqueado por privacidad, o si fue eliminado.
 
 Facebook nunca devuelve HTTP 401. En su lugar sirve un HTML aparentemente
 normal que internamente contiene señales específicas según el tipo de bloqueo:
+
+    TIPO 0 — Contenido no disponible  ← tiene MAYOR prioridad en la detección
+    ─────────────────────────────────────────────────────────────────────────
+    El propietario eliminó el contenido, cambió su privacidad a un grupo muy
+    reducido, o la cuenta fue desactivada. El HTML contiene una ruta de error
+    con un mensaje específico en los props del rootView. Autenticarse no
+    cambia el resultado — el contenido no es accesible para nadie.
+
+    Señal: ``"title":"This content isn't available right now"`` en los props
+    del rootView del bloque ScheduledServerJS.
+
+    Resultado: ``AuthResult(requires_auth=False, auth_type="content_unavailable")``
 
     TIPO A — Error de ruta raíz (CometErrorRoute)
     ───────────────────────────────────────────────
@@ -58,7 +70,7 @@ class AuthResult:
     """Resultado del análisis de bloqueo de acceso."""
     requires_auth: bool
     reason: str | None = None   # descripción de la señal detectada
-    auth_type: str | None = None  # "error_route" | "login_redirect" | "privacy_wall"
+    auth_type: str | None = None  # "content_unavailable" | "error_route" | "login_redirect" | "privacy_wall"
 
 
 # ===========================================================================
@@ -101,6 +113,32 @@ _URL_SIGNALS: list[tuple[str, str]] = [
     (r"[?&]next=.*(?:permalink|story_fbid|photo)", "login redirect con next="),
 ]
 
+# ── Contenido explícitamente no disponible (mayor prioridad que _CONTENT_PRESENT)
+# Facebook muestra este error cuando el contenido fue eliminado o la privacidad
+# del propietario impide el acceso a cualquier usuario. Las señales están en los
+# props del rootView del bloque ScheduledServerJS y son exclusivas de este estado:
+# NO aparecen en muros de login ni en páginas con contenido accesible.
+#
+# ⚠ ORDEN CRÍTICO: esta lista debe evaluarse ANTES de _CONTENT_PRESENT.
+#   Un post no disponible puede incluir en su HTML referencias a "comet.post"
+#   dentro del WebLoomConfig de métricas (no como tracePolicy real), lo que
+#   dispararía un falso negativo en _CONTENT_PRESENT si evaluásemos primero.
+_CONTENT_UNAVAILABLE: list[tuple[str, str]] = [
+    # Título específico del error de contenido no disponible en los props del
+    # rootView. Solo aparece cuando el servidor establece la ruta como
+    # CometErrorRoute con este mensaje concreto — distinguible del muro de login.
+    (
+        r'"title"\s*:\s*"This content isn\'t available(?: right now)?"',
+        "content_unavailable: título rootView — contenido eliminado o restringido",
+    ),
+    # Cuerpo del mensaje de error que Facebook muestra con este estado.
+    # La combinación "deleted" o "small group" en el body es exclusiva de este caso.
+    (
+        r'"body"\s*:\s*"When this happens[^"]*(?:deleted|small group)',
+        "content_unavailable: body rootView — contenido eliminado o restringido",
+    ),
+]
+
 # ── Señales de contenido PRESENTE (página normal) ────────────────────────────
 # Si estas señales aparecen, la página tiene contenido real aunque tenga
 # un popup de login encima → NO bloquear.
@@ -124,12 +162,15 @@ _CONTENT_PRESENT: list[str] = [
 def requires_auth(html_content: str, final_url: str = "") -> AuthResult:
     """Detecta si el HTML de Facebook indica que se requiere autenticación.
 
-    Analiza el HTML en tres capas en orden de prioridad:
+    Analiza el HTML en capas ordenadas de más específica a más general.
+    El orden es crítico: capas más específicas deben ejecutarse primero
+    para evitar que señales generales produzcan falsos negativos.
 
-        1. Presencia de señales de contenido real (early exit: NO bloqueado)
-        2. URL final redirigida a /login o /checkpoint
-        3. Señales JSON fuertes (tracePolicy, canonicalRouteName)
-        4. Señales JSON combinadas (CometErrorRoot + privacy)
+        1. Contenido explícitamente no disponible (eliminado/restringido para todos)
+        2. Presencia de señales de contenido real (early exit: NO bloqueado)
+        3. URL final redirigida a /login o /checkpoint
+        4. Señales JSON fuertes (tracePolicy, canonicalRouteName)
+        5. Señales JSON combinadas (CometErrorRoot + privacy)
 
     La función NO usa elementos del DOM (``div[role="dialog"]`` etc.) para
     evitar falsos positivos con popups de onboarding o banners de cookies
@@ -140,14 +181,36 @@ def requires_auth(html_content: str, final_url: str = "") -> AuthResult:
         final_url:    URL final tras redirecciones HTTP.
 
     Returns:
-        :class:`AuthResult` con ``requires_auth=True`` y la ``reason``
-        de la primera señal detectada.
+        :class:`AuthResult` con:
+        - ``requires_auth=False`` + ``auth_type="content_unavailable"`` si el
+          contenido fue eliminado o restringido permanentemente.
+        - ``requires_auth=False`` sin ``auth_type`` si la página tiene contenido real.
+        - ``requires_auth=True`` con ``auth_type`` correspondiente si hay muro de auth.
     """
     # ── Capa 0: Página vacía ──────────────────────────────────────────────────
     if not html_content:
         return AuthResult(requires_auth=False)
 
-    # ── Capa 1: ¿Hay contenido real? → salir rápido, NO está bloqueado ────────
+    # ── Capa 1: ¿Contenido explícitamente no disponible? ─────────────────────
+    # Se evalúa ANTES que _CONTENT_PRESENT porque un post no disponible puede
+    # contener en el HTML referencias a "comet.post" dentro del WebLoomConfig
+    # de métricas de rendimiento (no como tracePolicy real de la ruta activa).
+    # Evaluar _CONTENT_PRESENT primero provocaría un falso negativo — la página
+    # sería clasificada como "tiene contenido" cuando en realidad el post no
+    # existe o no es accesible para nadie.
+    #
+    # Una señal basta — son exclusivas de este estado y no aparecen en muros
+    # de login genuinos ni en páginas con contenido visible.
+    for pattern, reason in _CONTENT_UNAVAILABLE:
+        if re.search(pattern, html_content, re.I | re.S):
+            logger.debug("Contenido no disponible detectado | reason=%s", reason)
+            return AuthResult(
+                requires_auth=False,
+                reason=reason,
+                auth_type="content_unavailable",
+            )
+
+    # ── Capa 2: ¿Hay contenido real? → salir rápido, NO está bloqueado ────────
     # Si la ruta es de post/reel/perfil real, la página tiene contenido
     # aunque tenga un popup de login superpuesto.
     for pattern in _CONTENT_PRESENT:
@@ -155,7 +218,7 @@ def requires_auth(html_content: str, final_url: str = "") -> AuthResult:
             logger.debug("Contenido presente detectado — no se considera bloqueado")
             return AuthResult(requires_auth=False)
 
-    # ── Capa 2: URL final ─────────────────────────────────────────────────────
+    # ── Capa 3: URL final ─────────────────────────────────────────────────────
     if final_url:
         for pattern, reason in _URL_SIGNALS:
             if re.search(pattern, final_url, re.I):
@@ -166,7 +229,7 @@ def requires_auth(html_content: str, final_url: str = "") -> AuthResult:
                     auth_type="login_redirect",
                 )
 
-    # ── Capa 3: Señales JSON fuertes (una sola basta) ─────────────────────────
+    # ── Capa 4: Señales JSON fuertes (una sola basta) ─────────────────────────
     for pattern, reason in _JSON_STRONG:
         if re.search(pattern, html_content, re.I):
             logger.debug("Auth por JSON fuerte | reason=%s", reason)
@@ -176,7 +239,7 @@ def requires_auth(html_content: str, final_url: str = "") -> AuthResult:
                 auth_type="error_route",
             )
 
-    # ── Capa 4: Señales JSON combinadas (necesitan ambas) ─────────────────────
+    # ── Capa 5: Señales JSON combinadas (necesitan ambas) ─────────────────────
     combined_hits: list[str] = []
     for pattern, reason in _JSON_COMBINED:
         if re.search(pattern, html_content, re.I):

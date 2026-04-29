@@ -132,6 +132,17 @@ class FacebookScraper(BaseScraper):
 
         # ── Detección de muro de autenticación ───────────────────────────────
         auth = requires_auth(fetch_result.html_content, final_url)
+
+        if auth.auth_type == "content_unavailable":
+            # El contenido fue eliminado o restringido permanentemente.
+            # Autenticarse no cambia el resultado — retornar directamente
+            # sin consumir cuentas del pool.
+            logger.info(
+                "Contenido no disponible | url=%s | reason=%s",
+                final_url, auth.reason,
+            )
+            return self._content_unavailable_result(final_url)
+
         if auth.requires_auth:
             # Intentar recuperarse con o sin cuenta según el contexto.
             fetch_result = await self._handle_auth_wall(auth.reason, final_url)
@@ -434,6 +445,29 @@ class FacebookScraper(BaseScraper):
             "raw_data_available":      False,
             "graphql_responses_count": 0,
             "status":                  "error",
+        }
+
+    def _content_unavailable_result(self, final_url: str = "") -> dict[str, Any]:
+        """Resultado para contenido eliminado o restringido permanentemente.
+
+        Se diferencia de ``_error_result`` en el ``status``: ``content_unavailable``
+        indica al caller que el contenido no existe o no es accesible para nadie,
+        no que el scraping haya fallado por un error técnico o de autenticación.
+
+        Args:
+            final_url: URL final tras redirecciones HTTP.
+
+        Returns:
+            Dict con ``status="content_unavailable"`` y ``raw_data_available=False``.
+        """
+        return {
+            **self._base_result("facebook"),
+            "final_url":               final_url or self.config.url,
+            "scraped_at":              datetime.now(),
+            "error":                   "Content not available — deleted or restricted",
+            "raw_data_available":      False,
+            "graphql_responses_count": 0,
+            "status":                  "content_unavailable",
         }
 
     def _merge_video_into_reel(
