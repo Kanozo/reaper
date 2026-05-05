@@ -121,12 +121,13 @@ def get_parser_from_fb_url(url: str) -> str:
         return "VideoParser"
 
     # ── Regla 4: Foto individual (photo.php o /photo/) ───────────────────────
-    # photo.php?fbid=<id>       → visor clásico
-    # /photo/?fbid=<id>         → variante moderna
-    # /<user>/photos/<id>/      → foto en álbum
+    # photo.php?fbid=<id>                → visor clásico
+    # /photo/?fbid=<id>                  → variante moderna
+    # /<user>/photos/<id>/               → foto en álbum (sin slug)
+    # /<user>/photos/<slug>/<id>/        → foto en álbum (con slug) ← FIX
     if re.search(r"/photo(?:s|\.php)?/?", path, re.I) and (
         re.search(r"(?:^|&)fbid=\d+", query)
-        or re.search(r"/photos?/\d+", path, re.I)
+        or re.search(r"/photos?/(?:[^/]+/)?\d+", path, re.I)  # ← Regex actualizado
     ):
         return "PhotoParser"
 
@@ -213,4 +214,4 @@ def _normalize_url(url: str) -> tuple[str, str]:
     except Exception:
         return "/", ""
     
-#print (get_parser_from_fb_url("https://www.facebook.com/NoticiasTelemundo/posts/-liveblog-l-la-casa-blanca-afirma-que-quienes-creen-en-las-teor%C3%ADas-de-conspiraci/1532119218279349/"))
+#print (get_parser_from_fb_url("https://www.facebook.com/CiberCubaNoticias/photos/su-mam%C3%A1-la-vio-y-rompi%C3%B3-a-llorar-%EF%B8%8Fcibercuba-te-lo-explica-una-cubana-regres%C3%B3-por/1451544977018022/"))

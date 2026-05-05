@@ -302,6 +302,12 @@ class NetworkInterceptor:
         self._api_requests: list[CapturedRequest] = []
         self._api_responses: list[CapturedResponse] = []
 
+        # ── Índice de correlación request → meta ──
+        # Clave: URL de la petición
+        # Valor: Lista de GraphQLMeta pendientes (puede haber varias peticiones
+        #        simultáneas a la misma URL con distintas operaciones)
+        self._pending_meta: dict[str, list[GraphQLMeta]] = {}        
+
         # Contador global de eventos para monitorización de actividad (infinity-scroll).
         self._activity_count: int = 0
 
@@ -580,8 +586,8 @@ class NetworkInterceptor:
             print(f"  ↓ [GQL] {response.status} {op} {body_info}")
 
         # ── Encolar para persistencia asíncrona ──
-        if self.writer:
-            await self.writer.enqueue(captured)
+        #if self.writer:
+        #    await self.writer.enqueue(captured)
 
     # ------------------------------------------------------------------
     # Helpers privados
