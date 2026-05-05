@@ -71,8 +71,8 @@ class IgReelParser(BaseParser):
                     "error":       str | None,
                     "raw_data_available": bool,
                     "code":        str,
+                    "post_user_id":str,
                     "id":          str,
-                    "pk":          str,
                     "permalink_url": str,
                     "posted_at":   Optional[datetime],
                     "user": {
@@ -192,8 +192,8 @@ class IgReelParser(BaseParser):
 
         reel: dict[str, Any] = {
             "code": code,
-            "id": data.get("id"),
-            "pk": data.get("pk"),
+            "post_user_id": data.get("id"),
+            "id": data.get("pk"),
             "permalink_url": permalink,
             "posted_at": self._parse_timestamp(data.get("taken_at")),
             "user": self._build_user_dict(user) if user else None,
@@ -268,8 +268,8 @@ class IgReelParser(BaseParser):
         media_type_raw = self._safe_get(data, "media_type", default=0)
 
         entry: dict[str, Any] = {
-            "id": post_id,
-            "pk": self._safe_get(data, "pk"),
+            "post_user_id": post_id,
+            "id": self._safe_get(data, "pk"),
             "code": code,
             "permalink_url": (
                 f"https://www.instagram.com/p/{code}" if code else self.final_url

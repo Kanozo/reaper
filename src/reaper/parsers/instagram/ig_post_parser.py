@@ -69,7 +69,7 @@ class IgPostParser(BaseParser):
                     "raw_data_available": bool,
                     "code":        str,          # shortcode del post (ej. "DVQ7dz...")
                     "id":          str,
-                    "pk":          str,
+                    "post_user_id":          str,
                     "permalink_url": str,
                     "posted_at":   Optional[datetime],
                     "user": {
@@ -171,8 +171,8 @@ class IgPostParser(BaseParser):
         """
         code = data.get("code")
         self.result["code"] = code
-        self.result["id"] = data.get("id")
-        self.result["pk"] = data.get("pk")
+        self.result["post_user_id"] = data.get("id")
+        self.result["id"] = data.get("pk")
 
         # URL permanente: preferir la canónica con el shortcode
         self.result["permalink_url"] = (
@@ -274,8 +274,8 @@ class IgPostParser(BaseParser):
         media_type_raw = self._safe_get(data, "media_type", default=0)
 
         entry: dict[str, Any] = {
-            "id": post_id,
-            "pk": self._safe_get(data, "pk"),
+            "post_user_id": post_id,
+            "id": self._safe_get(data, "pk"),
             "code": code,
             "permalink_url": (
                 f"https://www.instagram.com/p/{code}" if code else self.final_url
