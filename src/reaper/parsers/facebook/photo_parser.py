@@ -91,7 +91,7 @@ class PhotoParser(FacebookContentParser):
             self._extract_group()
             self._parse_traffic()
 
-            logger.info("Foto parseada correctamente | url=%s", self.final_url)
+            logger.debug("Foto parseada correctamente | url=%s", self.final_url)
 
         except Exception as exc:
             self.result["error"] = str(exc)

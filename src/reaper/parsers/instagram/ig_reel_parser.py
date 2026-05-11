@@ -112,7 +112,7 @@ class IgReelParser(BaseParser):
         # --- Paso 2: Feed del perfil del autor (opcional) ---
         self._extract_profile_feed(blocks)
 
-        logger.info("Reel de Instagram parseado correctamente | url=%s", self.final_url)
+        logger.debug("Reel de Instagram parseado correctamente | url=%s", self.final_url)
         return self.result
 
     # ------------------------------------------------------------------

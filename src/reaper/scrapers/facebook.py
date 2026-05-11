@@ -122,6 +122,7 @@ class FacebookScraper(BaseScraper):
         # _fetch_with_account() usa una cuenta si hay AccountManager,
         # o hace una petición anónima si no.
         fetch_result = await self._fetch_with_account("facebook")
+        #fetch_result = await self._fetch()
 
         if not fetch_result.success:
             error_msg = fetch_result.error or "Error desconocido en el fetch."
@@ -159,7 +160,7 @@ class FacebookScraper(BaseScraper):
         parser_name   = get_parser_from_fb_url(final_url)
         primary_class = _PRIMARY_PARSER_MAP.get(parser_name)
 
-        logger.info(
+        logger.debug(
             "Parser seleccionado | parser=%s | url_final=%s", parser_name, final_url
         )
 
@@ -241,7 +242,7 @@ class FacebookScraper(BaseScraper):
         fallback_class = _FALLBACK_PARSER_MAP.get(parser_name)
 
         if fallback_class:
-            logger.info(
+            logger.debug(
                 "Fallback | %s → %s | url=%s",
                 parser_name, fallback_class.__name__, final_url,
             )
@@ -253,7 +254,7 @@ class FacebookScraper(BaseScraper):
                 debug=self.config.debug,
             ).parse()
             if result.get("raw_data_available"):
-                logger.info(
+                logger.debug(
                     "Extracción completada con fallback | parser=%s | url=%s",
                     fallback_class.__name__, final_url,
                 )
@@ -388,7 +389,7 @@ class FacebookScraper(BaseScraper):
             )
             return None
 
-        logger.info(
+        logger.debug(
             "Reintento autenticado exitoso | url=%s", retry_final_url
         )
         return retry_result
@@ -491,7 +492,7 @@ class FacebookScraper(BaseScraper):
         )
         reel_result["feed"]       = merged_feed
         reel_result["feed_video"] = feed_exclusive
-        logger.info(
+        logger.debug(
             "Merge video→reel | attachments=%d | feed_merged=%d | feed_video=%d",
             len(reel_result["attachments"]), len(merged_feed), len(feed_exclusive),
         )

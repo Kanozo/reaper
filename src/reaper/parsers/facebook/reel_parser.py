@@ -99,7 +99,7 @@ class ReelParser(FacebookContentParser):
                 self.result["feed"].append(feed_entry)
 
             self._parse_traffic()
-            logger.info(
+            logger.debug(
                 "Reel parseado correctamente. Feed: %d entradas.",
                 len(self.result["feed"]),
             )

@@ -114,7 +114,7 @@ class VideoParser(FacebookContentParser):
             self._extract_engagement_metrics()
             self._extract_related_feed()
             self._parse_traffic()
-            logger.info(
+            logger.debug(
                 "Vídeo parseado correctamente. Feed: %d vídeos relacionados.",
                 len(self.result["feed"]),
             )

@@ -111,7 +111,7 @@ class IgPostParser(BaseParser):
         # --- Paso 2: Feed lateral del perfil (datos adicionales opcionales) ---
         self._extract_feed(blocks)
 
-        logger.info("Post de Instagram parseado correctamente | url=%s", self.final_url)
+        logger.debug("Post de Instagram parseado correctamente | url=%s", self.final_url)
         return self.result
 
     # ------------------------------------------------------------------

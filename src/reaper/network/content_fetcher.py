@@ -471,7 +471,7 @@ class ContentFetcher:
             result.traffic = interceptor.get_traffic()
             result.updated_cookies = getattr(self, "_updated_cookies", None)
             result.success = True
-            logger.info("Contenido obtenido. Tráfico: %s", result.traffic.summary())
+            logger.debug("Contenido obtenido. Tráfico: %s", result.traffic.summary())
 
         except Exception as exc:
             result.error = str(exc)
@@ -635,7 +635,7 @@ class ContentFetcher:
             no_change_count = 0
             iteration = 0
 
-            logger.info("Iniciando auto-scroll (modo altura DOM)...")
+            logger.debug("Iniciando auto-scroll (modo altura DOM)...")
 
             while iteration < self.cfg.MAX_SCROLL_ITERATIONS:
                 await page.mouse.wheel(0, self.cfg.SCROLL_DELTA)
@@ -651,7 +651,7 @@ class ContentFetcher:
                         self.cfg.NO_CHANGE_THRESHOLD,
                     )
                     if no_change_count >= self.cfg.NO_CHANGE_THRESHOLD:
-                        logger.info("Auto-scroll finalizado: sin más contenido.")
+                        logger.debug("Auto-scroll finalizado: sin más contenido.")
                         break
                 else:
                     no_change_count = 0
@@ -700,7 +700,7 @@ class ContentFetcher:
             await page.mouse.move(cx, cy)
             logger.debug("Cursor en centro de página: X=%.0f, Y=%.0f", cx, cy)
 
-            logger.info("Iniciando infinity-scroll (modo tráfico de red)...")
+            logger.debug("Iniciando infinity-scroll (modo tráfico de red)...")
 
             no_activity_count = 0
             iteration = 0
@@ -739,7 +739,7 @@ class ContentFetcher:
                 baseline = interceptor.snapshot_activity()
 
             await asyncio.sleep(3)
-            logger.info(
+            logger.debug(
                 "Infinity-scroll finalizado. Tráfico total: %s",
                 interceptor.get_traffic().summary(),
             )
@@ -894,7 +894,7 @@ class ContentFetcher:
                 encoding="utf-8",
             )
 
-            logger.info("Sesión debug guardada en: %s", session_dir)
+            logger.debug("Sesión debug guardada en: %s", session_dir)
             return session_dir
 
         except Exception as exc:
@@ -1106,7 +1106,7 @@ def load_debug_session(session_dir: str | Path) -> FetchResult:
         try:
             traffic_data = json.loads(traffic_path.read_text(encoding="utf-8"))
             traffic = deserialize_traffic(traffic_data, session_dir=session_path)
-            logger.info("Tráfico cargado: %s", traffic.summary())
+            logger.debug("Tráfico cargado: %s", traffic.summary())
         except (json.JSONDecodeError, OSError) as exc:
             logger.warning("Error cargando traffic.json: %s", exc)
 
@@ -1130,7 +1130,7 @@ def load_debug_session(session_dir: str | Path) -> FetchResult:
         debug_session_dir=session_path,
     )
 
-    logger.info("Sesión offline cargada desde: %s", session_path)
+    logger.debug("Sesión offline cargada desde: %s", session_path)
     return result
 
 

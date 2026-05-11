@@ -77,7 +77,7 @@ class GroupParser(FacebookContentParser):
             Diccionario con todos los campos del grupo. Si falla la
             localización de bloques, ``result["error"]`` indicará el motivo.
         """
-        logger.info("Iniciando extracción de GRUPO...")
+        logger.debug("Iniciando extracción de GRUPO...")
 
         self._blocks = self._extract_json_blocks()
 

@@ -146,7 +146,7 @@ class PostParser(FacebookContentParser):
             self.result["is_sponsored"] = self._story.get("sponsored_data") is not None
             self._parse_traffic()
 
-            logger.info("Post regular parseado correctamente.")
+            logger.debug("Post regular parseado correctamente.")
 
         except Exception as exc:
             self.result["error"] = str(exc)
@@ -645,7 +645,7 @@ class PostParser(FacebookContentParser):
 
         for response in comments_responses:
             edges = self._safe_get(
-                response,
+                response[0],
                 "data", "node",
                 "comment_rendering_instance_for_feed_location",
                 "comments", "edges",
