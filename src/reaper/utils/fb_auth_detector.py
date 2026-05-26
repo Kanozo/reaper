@@ -1,52 +1,40 @@
 """
 utils/fb_auth_detector.py
 =========================
-Detecta si una página de Facebook requiere autenticación,
+Detecta si una página de Facebook o Instagram requiere autenticación,
 si el contenido está bloqueado por privacidad, o si fue eliminado.
 
-Facebook nunca devuelve HTTP 401. En su lugar sirve un HTML aparentemente
+Ninguna plataforma devuelve HTTP 401. En su lugar sirven un HTML aparentemente
 normal que internamente contiene señales específicas según el tipo de bloqueo:
 
     TIPO 0 — Contenido no disponible  ← tiene MAYOR prioridad en la detección
     ─────────────────────────────────────────────────────────────────────────
     El propietario eliminó el contenido, cambió su privacidad a un grupo muy
-    reducido, o la cuenta fue desactivada. El HTML contiene una ruta de error
-    con un mensaje específico en los props del rootView. Autenticarse no
-    cambia el resultado — el contenido no es accesible para nadie.
+    reducido, o la cuenta fue desactivada.
 
-    Señal: ``"title":"This content isn't available right now"`` en los props
-    del rootView del bloque ScheduledServerJS.
+    Facebook:
+      Señal JSON: ``"title":"This content isn't available right now"``
 
-    Resultado: ``AuthResult(requires_auth=False, auth_type="content_unavailable")``
+    Instagram:
+      Texto visible en el HTML: ``Post isn't available`` /
+      ``The link may be broken, or the profile may have been removed``
 
-    TIPO A — Error de ruta raíz (CometErrorRoute)
-    ───────────────────────────────────────────────
-    El servidor establece la *ruta raíz* como ``comet.error`` en los bloques
-    JSON de bootstrap. Esto ocurre cuando:
-      - El post es privado o solo visible para un grupo reducido.
-      - El contenido ha sido eliminado.
-      - La cuenta está desactivada.
+    Resultado en todos los casos:
+      ``AuthResult(requires_auth=False, auth_type="content_unavailable")``
 
-    Señales en el HTML (bloque ScheduledServerJS / JSON embebido):
-      · ``"tracePolicy":"comet.error"``
-      · ``"canonicalRouteName":"comet.fbweb.CometErrorRoute"``
-      · ``"CometErrorRoot.react"`` como recurso del rootView
-      · ``"privacy":true`` en las props del rootView
+    TIPO A — Error de ruta raíz (CometErrorRoute)  — solo Facebook
+    ───────────────────────────────────────────────────────────────
+    Señales: ``"tracePolicy":"comet.error"``,
+             ``"canonicalRouteName":"comet.fbweb.CometErrorRoute"``
 
     TIPO B — Muro de login (redirección HTTP)
     ─────────────────────────────────────────
-    La URL final contiene ``/login`` o ``/checkpoint``.
-    Esto es menos frecuente porque Playwright sigue las redirecciones.
+    URL final con ``/login`` o ``/checkpoint`` (FB) o ``/accounts/login`` (IG).
 
     TIPO C — Popup de login superpuesto  ← NO es bloqueo real
     ──────────────────────────────────────────────────────────
-    Página con contenido accesible + dialog de onboarding o
-    popup de «inicia sesión para ver más». El contenido sí está
-    cargado en el DOM; solo hay un diálogo superpuesto.
-    Este caso NO debe tratarse como autenticación requerida.
-
-    ⚠ Por eso NO se usa ``div[role="dialog"]`` como señal: esa etiqueta
-      aparece tanto en páginas bloqueadas como en páginas normales.
+    Página con contenido accesible + dialog de onboarding superpuesto.
+    ⚠ NO se usa ``div[role="dialog"]`` como señal para evitar falsos positivos.
 
 Función pública::
 
@@ -77,81 +65,84 @@ class AuthResult:
 # Señales (ordenadas de más a menos específica)
 # ===========================================================================
 
-# ── Tipo A: Señales de ruta de error en bloques JSON ─────────────────────────
-# Estas señales están en los <script type="application/json"> que Facebook
-# incrusta en el HTML para configurar el cliente React/Relay.
-# Son MUY PRECISAS porque pertenecen a la estructura de datos interna.
-
+# ── Tipo A: Señales JSON fuertes en bloques ScheduledServerJS (Facebook) ─────
 _JSON_STRONG: list[tuple[str, str]] = [
-    # Señal más fiable: tracePolicy es siempre "comet.error" cuando la ruta
-    # raíz no puede renderizar el contenido solicitado.
     (r'"tracePolicy"\s*:\s*"comet\.error"',
      "tracePolicy=comet.error en rootView"),
-
-    # Nombre canónico de la ruta de error — solo aparece en páginas de error.
     (r'"canonicalRouteName"\s*:\s*"comet\.fbweb\.CometErrorRoute"',
      "canonicalRouteName=CometErrorRoute"),
 ]
 
 _JSON_COMBINED: list[tuple[str, str]] = [
-    # CometErrorRoot.react como recurso del rootView (puede aparecer en
-    # algunas páginas normales como fallback, pero combinado con "privacy":true
-    # es inequívoco).
     (r'"__dr"\s*:\s*"CometErrorRoot\.react"',
      "CometErrorRoot.react como recurso de ruta"),
-
-    # privacy:true en los props del rootView indica que Facebook sabe que el
-    # contenido existe pero está bloqueado por configuración de privacidad.
     (r'"privacy"\s*:\s*true',
      "privacy=true en props de rootView"),
 ]
 
 # ── Tipo B: URL final redirigida a login ──────────────────────────────────────
 _URL_SIGNALS: list[tuple[str, str]] = [
-    (r"facebook\.com/login",                "redirigido a /login"),
-    (r"facebook\.com/checkpoint",           "redirigido a /checkpoint"),
+    (r"facebook\.com/login",                     "redirigido a /login"),
+    (r"facebook\.com/checkpoint",                "redirigido a /checkpoint"),
     (r"[?&]next=.*(?:permalink|story_fbid|photo)", "login redirect con next="),
+    (r"instagram\.com/accounts/login",            "ig: redirigido a /accounts/login"),
 ]
 
-# ── Contenido explícitamente no disponible (mayor prioridad que _CONTENT_PRESENT)
-# Facebook muestra este error cuando el contenido fue eliminado o la privacidad
-# del propietario impide el acceso a cualquier usuario. Las señales están en los
-# props del rootView del bloque ScheduledServerJS y son exclusivas de este estado:
-# NO aparecen en muros de login ni en páginas con contenido accesible.
+# ── Contenido explícitamente no disponible ────────────────────────────────────
 #
-# ⚠ ORDEN CRÍTICO: esta lista debe evaluarse ANTES de _CONTENT_PRESENT.
-#   Un post no disponible puede incluir en su HTML referencias a "comet.post"
-#   dentro del WebLoomConfig de métricas (no como tracePolicy real), lo que
-#   dispararía un falso negativo en _CONTENT_PRESENT si evaluásemos primero.
+# ORDEN CRÍTICO: evaluada ANTES que _CONTENT_PRESENT.
+# Un post no disponible puede incluir "comet.post" en el WebLoomConfig de
+# métricas (no como tracePolicy real), lo que dispararía un falso negativo
+# en _CONTENT_PRESENT si se evaluase primero.
+#
+# Una sola señal basta para clasificar como content_unavailable.
 _CONTENT_UNAVAILABLE: list[tuple[str, str]] = [
-    # Título específico del error de contenido no disponible en los props del
-    # rootView. Solo aparece cuando el servidor establece la ruta como
-    # CometErrorRoute con este mensaje concreto — distinguible del muro de login.
+
+    # ── Facebook ─────────────────────────────────────────────────────────────
     (
         r'"title"\s*:\s*"This content isn\'t available(?: right now)?"',
-        "content_unavailable: título rootView — contenido eliminado o restringido",
+        "fb_content_unavailable: título rootView — contenido eliminado o restringido",
     ),
-    # Cuerpo del mensaje de error que Facebook muestra con este estado.
-    # La combinación "deleted" o "small group" en el body es exclusiva de este caso.
     (
         r'"body"\s*:\s*"When this happens[^"]*(?:deleted|small group)',
-        "content_unavailable: body rootView — contenido eliminado o restringido",
+        "fb_content_unavailable: body rootView — contenido eliminado o restringido",
+    ),
+
+    # ── Instagram ─────────────────────────────────────────────────────────────
+    # Texto visible que Instagram incluye en el HTML cuando el post no existe,
+    # fue eliminado, o su privacidad impide el acceso.
+    # Presente tanto en el <title> como en el cuerpo del HTML.
+    (
+        r"Post isn't available",
+        "ig_content_unavailable: Post isn't available",
+    ),
+    (
+        r"The link may be broken,?\s+or the profile may have been removed",
+        "ig_content_unavailable: link broken or profile removed",
     ),
 ]
 
 # ── Señales de contenido PRESENTE (página normal) ────────────────────────────
-# Si estas señales aparecen, la página tiene contenido real aunque tenga
-# un popup de login encima → NO bloquear.
+# Si alguna de estas señales aparece, la página tiene contenido real aunque
+# tenga un popup de login superpuesto → NO clasificar como bloqueado.
 _CONTENT_PRESENT: list[str] = [
-    # La ruta tiene datos de historia/post real
+    # ── Facebook ──────────────────────────────────────────────────────────────
     r'"tracePolicy"\s*:\s*"comet\.post',
     r'"tracePolicy"\s*:\s*"comet\.reels',
     r'"tracePolicy"\s*:\s*"comet\.profile',
     r'"tracePolicy"\s*:\s*"comet\.group(?!\.permalink)',
     r'"tracePolicy"\s*:\s*"comet\.mediaviewer',
     r'"tracePolicy"\s*:\s*"comet\.watch',
-    # El viewer tiene un ID real (usuario logueado o contenido público disponible)
     r'"viewer"\s*:\s*\{[^}]*"id"\s*:\s*"\d+',
+
+    # ── Instagram — señales JSON ───────────────────────────────────────────────
+    # "polaris.httpErrorPage" queda explícitamente FUERA para que los errores
+    # de IG no reciban un falso «contenido presente».
+    r'"tracePolicy"\s*:\s*"polaris\.post',
+    r'"tracePolicy"\s*:\s*"polaris\.reel',
+    r'"tracePolicy"\s*:\s*"polaris\.profile',
+    r'"tracePolicy"\s*:\s*"polaris\.explore',
+    r'"tracePolicy"\s*:\s*"polaris\.tag',
 ]
 
 
@@ -160,30 +151,28 @@ _CONTENT_PRESENT: list[str] = [
 # ===========================================================================
 
 def requires_auth(html_content: str, final_url: str = "") -> AuthResult:
-    """Detecta si el HTML de Facebook indica que se requiere autenticación.
+    """Detecta si el HTML de Facebook o Instagram indica que se requiere autenticación.
 
     Analiza el HTML en capas ordenadas de más específica a más general.
     El orden es crítico: capas más específicas deben ejecutarse primero
     para evitar que señales generales produzcan falsos negativos.
 
-        1. Contenido explícitamente no disponible (eliminado/restringido para todos)
+        1. Contenido explícitamente no disponible — dos niveles de señales:
+             · JSON (ScheduledServerJS, HTML SSR): canonicalRouteName, tracePolicy
+             · DOM (post-hidratación): <title>, <span> con texto de error
         2. Presencia de señales de contenido real (early exit: NO bloqueado)
-        3. URL final redirigida a /login o /checkpoint
-        4. Señales JSON fuertes (tracePolicy, canonicalRouteName)
-        5. Señales JSON combinadas (CometErrorRoot + privacy)
-
-    La función NO usa elementos del DOM (``div[role="dialog"]`` etc.) para
-    evitar falsos positivos con popups de onboarding o banners de cookies
-    que aparecen en páginas con contenido accesible.
+        3. URL final redirigida a /login, /checkpoint (FB) o /accounts/login (IG)
+        4. Señales JSON fuertes (tracePolicy, canonicalRouteName) — solo Facebook
+        5. Señales JSON combinadas (CometErrorRoot + privacy) — solo Facebook
 
     Args:
-        html_content: HTML renderizado por Playwright.
+        html_content: HTML renderizado por Playwright (SSR o post-hidratación).
         final_url:    URL final tras redirecciones HTTP.
 
     Returns:
         :class:`AuthResult` con:
         - ``requires_auth=False`` + ``auth_type="content_unavailable"`` si el
-          contenido fue eliminado o restringido permanentemente.
+          contenido fue eliminado o restringido permanentemente (FB e IG).
         - ``requires_auth=False`` sin ``auth_type`` si la página tiene contenido real.
         - ``requires_auth=True`` con ``auth_type`` correspondiente si hay muro de auth.
     """
@@ -192,15 +181,8 @@ def requires_auth(html_content: str, final_url: str = "") -> AuthResult:
         return AuthResult(requires_auth=False)
 
     # ── Capa 1: ¿Contenido explícitamente no disponible? ─────────────────────
-    # Se evalúa ANTES que _CONTENT_PRESENT porque un post no disponible puede
-    # contener en el HTML referencias a "comet.post" dentro del WebLoomConfig
-    # de métricas de rendimiento (no como tracePolicy real de la ruta activa).
-    # Evaluar _CONTENT_PRESENT primero provocaría un falso negativo — la página
-    # sería clasificada como "tiene contenido" cuando en realidad el post no
-    # existe o no es accesible para nadie.
-    #
-    # Una señal basta — son exclusivas de este estado y no aparecen en muros
-    # de login genuinos ni en páginas con contenido visible.
+    # Cubre señales JSON (HTML SSR) y señales DOM (HTML post-hidratación).
+    # Se evalúa ANTES que _CONTENT_PRESENT — ver nota en _CONTENT_UNAVAILABLE.
     for pattern, reason in _CONTENT_UNAVAILABLE:
         if re.search(pattern, html_content, re.I | re.S):
             logger.debug("Contenido no disponible detectado | reason=%s", reason)
@@ -211,8 +193,6 @@ def requires_auth(html_content: str, final_url: str = "") -> AuthResult:
             )
 
     # ── Capa 2: ¿Hay contenido real? → salir rápido, NO está bloqueado ────────
-    # Si la ruta es de post/reel/perfil real, la página tiene contenido
-    # aunque tenga un popup de login superpuesto.
     for pattern in _CONTENT_PRESENT:
         if re.search(pattern, html_content, re.I):
             logger.debug("Contenido presente detectado — no se considera bloqueado")

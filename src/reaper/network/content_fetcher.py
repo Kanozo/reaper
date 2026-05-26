@@ -1,6 +1,7 @@
 import asyncio
 import json
 from reaper.utils.logger import get_logger
+import random
 import re
 import traceback
 from datetime import datetime
@@ -12,6 +13,18 @@ from playwright.async_api import (
     BrowserContext,
     Page,
     async_playwright,
+)
+
+from reaper.anti_detection import (
+    BrowserFingerprint,
+    generate_fingerprint,
+    human_delay,
+    human_scroll,
+    micro_delay,
+    simulate_distraction,
+    simulate_idle,
+    simulate_reading_pause,
+    simulate_page_focus_blur
 )
 
 from reaper.network.interceptor import (
@@ -45,11 +58,15 @@ class BrowserConfig:
 
     # ---- Tiempos de espera ----
 
-    # Pausa tras la carga inicial (segundos). Da tiempo al JS para ejecutarse.
-    PAGE_LOAD_WAIT: float = 5.0
+    # Pausa máxima tras la carga inicial (segundos). Con anti-detección activa,
+    # se usa como límite superior de simulate_idle (que ya aporta el realismo).
+    # Reducido de 5.0 → 2.0 porque simulate_idle cubre la espera con movimiento.
+    PAGE_LOAD_WAIT: float = 2.0
 
     # Pausa entre iteraciones de scroll (segundos).
-    SCROLL_WAIT_TIME: float = 1.5
+    # Con anti-detección, human_scroll() aporta sus propios delays internos;
+    # este valor se usa solo como micro-pausa adicional de seguridad.
+    SCROLL_WAIT_TIME: float = 0.5
 
     # ---- Scroll ----
 
@@ -67,7 +84,7 @@ class BrowserConfig:
 
     # ---- Navegador ----
 
-    # User-Agent desktop moderno. Reduce detección como bot.
+    # User-Agent desktop moderno. Usado solo cuando USE_ANTI_DETECTION=False.
     USER_AGENT: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -78,10 +95,22 @@ class BrowserConfig:
     NAVIGATION_TIMEOUT_MS: int = 100_000
 
     # Viewport Full HD (se instancia en __init__ para evitar mutabilidad compartida).
+    # Usado solo cuando USE_ANTI_DETECTION=False; si está activo, el fingerprint
+    # genera su propio viewport coherente con el UA y el OS.
     VIEWPORT: dict[str, int] = None  # type: ignore[assignment]
 
     LOCALE: str = "en-US"
     TIMEZONE_ID: str = "America/New_York"
+
+    # ---- Anti-detección ----
+
+    # Si True, usa generate_fingerprint() para UA/viewport/locale/timezone aleatorio
+    # y coherente, inyecta stealth JS y aplica comportamiento humano en scroll/esperas.
+    USE_ANTI_DETECTION: bool = True
+
+    # Tipo de navegador para el fingerprint. "firefox" = mejor cobertura en Meta
+    # (Facebook/Instagram). "chromium" para otros targets.
+    ANTI_DETECTION_BROWSER_TYPE: str = "firefox"
 
     # ---- Proxy ----
     PROXY_SERVER: str | None = None    # "http://proxy.example.com:8080" | "socks5://..."
@@ -328,6 +357,7 @@ class ContentFetcher:
 
         self._html_content: str | None = None
         self._final_url: str | None = None
+        self._fingerprint: BrowserFingerprint | None = None
 
     # ------------------------------------------------------------------
     # Método público principal
@@ -395,8 +425,38 @@ class ContentFetcher:
         try:
             async with async_playwright() as pw:
                 browser = await self._launch_browser(pw)
-                context = await self._create_context(browser, proxy_config=proxy_config)
+
+                # ── Fingerprint anti-detección ────────────────────────────────
+                # Se genera ANTES del contexto para que build_context_options()
+                # configure UA, viewport, locale, timezone y headers de forma
+                # internamente coherente (el mismo perfil de hardware/OS).
+                fingerprint: BrowserFingerprint | None = None
+                if self.cfg.USE_ANTI_DETECTION:
+                    fingerprint = generate_fingerprint(
+                        self.cfg.ANTI_DETECTION_BROWSER_TYPE
+                    )
+                    self._fingerprint = fingerprint
+                    logger.debug(
+                        "Fingerprint generado | os=%s | ua=%.70s",
+                        fingerprint.navigator_platform,
+                        fingerprint.user_agent,
+                    )
+
+                context = await self._create_context(
+                    browser,
+                    proxy_config=proxy_config,
+                    fingerprint=fingerprint,
+                )
                 page = await context.new_page()
+
+                # ── Inyección de stealth JS ───────────────────────────────────
+                # DEBE ejecutarse ANTES de page.goto() para que los parches
+                # (navigator.webdriver, WebGL, canvas noise, etc.) estén activos
+                # desde el primer frame de la página, antes de cualquier script
+                # de detección que pueda cargar el servidor.
+                if fingerprint:
+                    await page.add_init_script(fingerprint.stealth_js)
+                    logger.debug("Stealth JS inyectado (%d bytes)", len(fingerprint.stealth_js))
 
                 # ── Inyección de cookies de sesión ────────────────────────────
                 # Las cookies se añaden al contexto ANTES de navegar para que
@@ -488,10 +548,11 @@ class ContentFetcher:
 
     async def _launch_browser(self, pw) -> Browser:
         """
-        Lanza Firefox con flags para reducir la detección como bot.
+        Lanza Firefox con configuración reducida de huellas de automatización.
 
-        Firefox ofrece mejor compatibilidad con Facebook respecto a Chromium
-        en términos de fingerprinting y anti-bot.
+        Los flags de Chromium (--disable-blink-features, --no-sandbox, etc.) no
+        aplican a Firefox y se omiten. La evasión en Firefox se logra principalmente
+        vía stealth JS (add_init_script) y el fingerprint coherente del contexto.
 
         Args:
             pw: Instancia activa de async_playwright.
@@ -501,41 +562,58 @@ class ContentFetcher:
         """
         return await pw.firefox.launch(
             headless=self.headless,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-            ],
+            firefox_user_prefs={
+                # Desactivar telemetría y reportes de crash que pueden revelar
+                # que el navegador no es usado interactivamente.
+                "toolkit.telemetry.enabled": False,
+                "toolkit.telemetry.unified": False,
+                "datareporting.healthreport.uploadEnabled": False,
+                "datareporting.policy.dataSubmissionEnabled": False,
+                # Deshabilitar Pocket y servicios de sincronización externos.
+                "extensions.pocket.enabled": False,
+                "identity.fxaccounts.enabled": False,
+                # Reducir fingerprint de fuentes del sistema.
+                "browser.display.use_document_fonts": 1,
+            },
         )
 
     async def _create_context(
         self,
         browser: Browser,
         proxy_config: dict[str, str] | None = None,
+        fingerprint: BrowserFingerprint | None = None,
     ) -> BrowserContext:
         """
-        Crea un contexto de navegador que simula un usuario desktop real.
+        Crea un contexto de navegador con fingerprint coherente o con config estática.
 
-        El viewport 1920×1080, el locale en-US y la zona horaria aumentan
-        la verosimilitud del perfil y reducen el riesgo de detección por
-        fingerprinting.
+        Cuando ``fingerprint`` está presente (``USE_ANTI_DETECTION=True``), delega
+        en ``BrowserFingerprint.build_context_options()`` que genera un perfil
+        internamente consistente: UA, viewport, locale, timezone y headers HTTP
+        corresponden al mismo sistema operativo y hardware simulado.
+
+        Cuando ``fingerprint`` es None (``USE_ANTI_DETECTION=False``), usa los
+        valores estáticos de ``BrowserConfig`` como fallback.
 
         Args:
             browser:      Instancia del navegador ya lanzado.
             proxy_config: dict con ``server``, ``username``, ``password`` (opcionales).
+            fingerprint:  BrowserFingerprint generado por ``generate_fingerprint()``.
+                          Si None, usa config estática.
 
         Returns:
             BrowserContext configurado y listo para abrir páginas.
         """
-        context_args: dict[str, Any] = {
-            "viewport": self.cfg.VIEWPORT,
-            "user_agent": self.cfg.USER_AGENT,
-            "locale": self.cfg.LOCALE,
-            "timezone_id": self.cfg.TIMEZONE_ID,
-        }
-
-        if proxy_config:
-            context_args["proxy"] = proxy_config
+        if fingerprint:
+            context_args = fingerprint.build_context_options(proxy=proxy_config)
+        else:
+            context_args = {
+                "viewport": self.cfg.VIEWPORT,
+                "user_agent": self.cfg.USER_AGENT,
+                "locale": self.cfg.LOCALE,
+                "timezone_id": self.cfg.TIMEZONE_ID,
+            }
+            if proxy_config:
+                context_args["proxy"] = proxy_config
 
         return await browser.new_context(**context_args)
 
@@ -548,8 +626,10 @@ class ContentFetcher:
         Navega a ``self.url`` y espera a que la red esté inactiva.
 
         Usa ``wait_until="networkidle"`` para asegurar que el contenido
-        dinámico (JS, API calls) haya terminado de cargarse. Añade una
-        pausa adicional configurable vía ``BrowserConfig.PAGE_LOAD_WAIT``.
+        dinámico (JS, API calls) haya terminado de cargarse. Con anti-detección
+        activa sustituye el ``asyncio.sleep`` fijo por ``simulate_idle`` (ratón
+        en movimiento natural) y ocasionalmente simula un cambio de pestaña
+        para activar eventos ``visibilitychange`` que páginas reales disparan.
 
         Args:
             page: Página de Playwright activa.
@@ -565,8 +645,26 @@ class ContentFetcher:
                 timeout=self.cfg.NAVIGATION_TIMEOUT_MS,
             )
             logger.info("URL final: %s", page.url)
-            logger.debug("Pausa de carga: %.1fs", self.cfg.PAGE_LOAD_WAIT)
-            await asyncio.sleep(self.cfg.PAGE_LOAD_WAIT)
+
+            if self.cfg.USE_ANTI_DETECTION:
+                # simulate_idle aporta movimiento de ratón realista durante la espera;
+                # el rango aleatorio evita el patrón de duración fija que detectan
+                # los sistemas basados en timing.
+                idle_duration = random.uniform(
+                    self.cfg.PAGE_LOAD_WAIT * 0.5,
+                    self.cfg.PAGE_LOAD_WAIT,
+                )
+                logger.debug("Post-nav idle: %.2fs", idle_duration)
+                await simulate_idle(page, idle_duration)
+
+                # 35% de probabilidad de simular un cambio de pestaña breve.
+                # Activa los eventos visibilitychange que esperan algunos trackers.
+                if random.random() < 0.35:
+                    await simulate_page_focus_blur(page)
+            else:
+                logger.debug("Pausa de carga: %.1fs", self.cfg.PAGE_LOAD_WAIT)
+                await asyncio.sleep(self.cfg.PAGE_LOAD_WAIT)
+
             return True
 
         except Exception as exc:
@@ -604,16 +702,16 @@ class ContentFetcher:
         """
         Scroll automático midiendo cambios de ``scrollHeight`` del contenedor.
 
+        Con anti-detección activa sustituye ``mouse.wheel`` + ``asyncio.sleep``
+        fijo por ``human_scroll()`` (ráfagas variables con micro-pausas internas)
+        y añade comportamiento idle y distracciones ocasionales entre iteraciones.
+
         Estrategia:
             1. Localiza ``div[role='dialog']`` y obtiene su bounding box.
             2. Posiciona el cursor en el centro superior del contenedor.
-            3. En cada iteración hace ``mouse.wheel(0, SCROLL_DELTA)`` y compara
-               ``scrollHeight`` con la iteración anterior.
+            3. En cada iteración hace scroll humano y compara ``scrollHeight``.
             4. Si ``scrollHeight`` no cambia por ``NO_CHANGE_THRESHOLD``
                iteraciones consecutivas, detiene el scroll.
-
-        Se usa ``mouse.wheel()`` en vez de ``page.evaluate()`` para simular
-        un evento de hardware real, más difícil de detectar como bot.
 
         Args:
             page: Página de Playwright activa (con interceptor ya adjunto).
@@ -638,8 +736,15 @@ class ContentFetcher:
             logger.debug("Iniciando auto-scroll (modo altura DOM)...")
 
             while iteration < self.cfg.MAX_SCROLL_ITERATIONS:
-                await page.mouse.wheel(0, self.cfg.SCROLL_DELTA)
-                await asyncio.sleep(self.cfg.SCROLL_WAIT_TIME)
+                if self.cfg.USE_ANTI_DETECTION:
+                    # human_scroll gestiona internamente los delays entre ráfagas,
+                    # simulando la rueda del ratón de forma irregular.
+                    await human_scroll(page, direction="down", amount=self.cfg.SCROLL_DELTA)
+                    # Micro-pausa adicional mientras el DOM procesa el scroll.
+                    await micro_delay(150, int(self.cfg.SCROLL_WAIT_TIME * 1000))
+                else:
+                    await page.mouse.wheel(0, self.cfg.SCROLL_DELTA)
+                    await asyncio.sleep(self.cfg.SCROLL_WAIT_TIME)
 
                 current_height = await container.evaluate("el => el.scrollHeight")
 
@@ -655,12 +760,30 @@ class ContentFetcher:
                         break
                 else:
                     no_change_count = 0
+                    height_delta = current_height - last_height
                     last_height = current_height
-                    logger.debug("scrollHeight: %dpx", current_height)
+                    logger.debug("scrollHeight: %dpx (+%dpx)", current_height, height_delta)
+
+                    # Pausa proporcional al contenido recién cargado: el usuario lee
+                    # lo que acaba de aparecer. Estimación: ~1 palabra cada 15px de
+                    # delta (heurístico conservador para texto + imágenes intercaladas).
+                    if self.cfg.USE_ANTI_DETECTION:
+                        words_visible = max(20, height_delta // 15)
+                        await simulate_reading_pause(page, words_visible)
+
+                # Distracción ocasional (15% por iteración): el usuario aparta
+                # brevemente el cursor del área de contenido.
+                if self.cfg.USE_ANTI_DETECTION and random.random() < 0.15:
+                    await simulate_distraction(page)
+                    await page.mouse.move(center_x, start_y)
 
                 iteration += 1
 
-            await asyncio.sleep(2)
+            # Pausa final mientras el usuario termina de leer el contenido cargado.
+            if self.cfg.USE_ANTI_DETECTION:
+                await simulate_idle(page, random.uniform(0.8, 1.5))
+            else:
+                await asyncio.sleep(2)
 
         except Exception as exc:
             logger.warning("Error en auto-scroll: %s", exc)
@@ -677,9 +800,10 @@ class ContentFetcher:
         """
         Scroll continuo monitorizando la actividad de red para detectar carga.
 
-        Usa el ``NetworkInterceptor`` compartido (ya adjunto) para detectar
-        si el scroll está generando nuevas peticiones de red.
-        **No configura sus propios listeners.**
+        Con anti-detección activa sustituye los ``asyncio.sleep`` fijos por
+        ``simulate_idle`` y ``human_delay``, reduciendo el tiempo total de espera
+        sin sacrificar el realismo: el ratón sigue en movimiento y los intervalos
+        siguen distribuciones gaussianas en lugar de valores constantes.
 
         Estrategia:
             1. Captura un snapshot de actividad del interceptor (baseline).
@@ -711,8 +835,18 @@ class ContentFetcher:
                 and no_activity_count < self.cfg.INFINITY_NO_REQUESTS_THRESHOLD
             ):
                 iteration += 1
-                await page.mouse.wheel(0, self.cfg.SCROLL_DELTA)
-                await asyncio.sleep(self.cfg.SCROLL_WAIT_TIME)
+
+                if self.cfg.USE_ANTI_DETECTION:
+                    await human_scroll(page, direction="down", amount=self.cfg.SCROLL_DELTA)
+                else:
+                    await page.mouse.wheel(0, self.cfg.SCROLL_DELTA)
+
+                # Pausa base entre scroll y medición de actividad.
+                # human_delay usa distribución gaussiana → evita el patrón fijo.
+                if self.cfg.USE_ANTI_DETECTION:
+                    await human_delay(min_seconds=1.0, max_seconds=2.0)
+                else:
+                    await asyncio.sleep(self.cfg.SCROLL_WAIT_TIME)
 
                 new_events = interceptor.new_activity_since(baseline)
                 logger.debug(
@@ -724,21 +858,47 @@ class ContentFetcher:
 
                 if new_events > 0:
                     no_activity_count = 0
-                    await asyncio.sleep(3.5)
+                    # Espera mientras la red procesa las respuestas.
+                    # simulate_idle mantiene el ratón activo durante la carga.
+                    if self.cfg.USE_ANTI_DETECTION:
+                        await simulate_idle(page, random.uniform(1.0, 2.0))
+                    else:
+                        await asyncio.sleep(3.5)
                 else:
                     no_activity_count += 1
 
                     if no_activity_count == 2:
                         logger.debug("Scroll agresivo de refuerzo...")
                         await page.mouse.wheel(0, 1_500)
-                        await asyncio.sleep(5.5)
+                        # Espera más generosa para que el servidor responda al
+                        # scroll agresivo; human_delay varía para no ser predecible.
+                        if self.cfg.USE_ANTI_DETECTION:
+                            await human_delay(min_seconds=2.0, max_seconds=4.0)
+                        else:
+                            await asyncio.sleep(5.5)
                         if interceptor.new_activity_since(baseline) > 0:
                             no_activity_count = 0
 
-                await asyncio.sleep(5.0)
+                # Pausa inter-iteración: el usuario está leyendo el contenido cargado.
+                # Con anti-detección: rango reducido (1.5-3s vs 5s fijo) + idle activo.
+                if self.cfg.USE_ANTI_DETECTION:
+                    await simulate_idle(page, random.uniform(1.0, 2.5))
+                else:
+                    await asyncio.sleep(5.0)
+
                 baseline = interceptor.snapshot_activity()
 
-            await asyncio.sleep(3)
+                # Distracción ocasional (10%): añade variabilidad a nivel de sesión.
+                if self.cfg.USE_ANTI_DETECTION and random.random() < 0.10:
+                    await simulate_distraction(page)
+                    await page.mouse.move(cx, cy)
+
+            # Pausa final tras terminar el scroll.
+            if self.cfg.USE_ANTI_DETECTION:
+                await simulate_idle(page, random.uniform(0.8, 1.5))
+            else:
+                await asyncio.sleep(3)
+
             logger.debug(
                 "Infinity-scroll finalizado. Tráfico total: %s",
                 interceptor.get_traffic().summary(),

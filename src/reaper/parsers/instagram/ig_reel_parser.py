@@ -51,6 +51,7 @@ class IgReelParser(BaseParser):
         # self.original_url y self.result ya inicializados por BaseParser.
         # Campos específicos de IgReelParser:
         self.result.update({
+            "__typename": "regular_reel",
             "feed": [],  # reels relacionados + posts del perfil del autor
         })
 

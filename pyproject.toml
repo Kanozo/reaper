@@ -22,7 +22,7 @@ build-backend = "setuptools.build_meta"
 # ------------------------------------------------------------------------------
 [project]
 name        = "reaper"
-version     = "0.1.0"
+version     = "0.1.1"
 description = "Librería Python para scraping de Facebook e Instagram"
 readme      = "README.md"
 license     = { text = "MIT" }

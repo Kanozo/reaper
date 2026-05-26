@@ -48,6 +48,7 @@ class IgPostParser(BaseParser):
         # self.original_url y self.result ya inicializados por BaseParser.
         # Campos específicos de IgPostParser:
         self.result.update({
+            "__typename": "regular_post",
             "feed": [],  # posts adicionales del perfil del autor
         })
 
@@ -223,14 +224,7 @@ class IgPostParser(BaseParser):
     def _extract_feed(self, blocks: list[dict]) -> None:
         """
         Localiza el nodo ``xdt_api__v1__profile_timeline`` y extrae la lista
-        de posts adicionales del perfil del autor que Instagram sirve junto
-        al post principal.
-
-        Los datos se añaden a ``self.result["feed"]``. Cada ítem del feed
-        contiene un subconjunto de los campos del post principal.
-
-        Args:
-            blocks: Lista de dicts con todos los bloques JSON del HTML.
+        de posts adicionales del perfil del autor.
         """
         for block in blocks:
             node = self._recursive_search(
@@ -240,13 +234,16 @@ class IgPostParser(BaseParser):
             if not node:
                 continue
 
-            items = self._safe_get(node, "xdt_api__v1__profile_timeline", "items")
+            timeline = node.get("xdt_api__v1__profile_timeline", {})
+            # La clave puede ser "items" o "profile_grid_items". Se prefiere "profile_grid_items".
+            items = timeline.get("profile_grid_items") or timeline.get("items")
             if not items or not isinstance(items, list):
                 continue
 
             for item in items:
-                feed_entry = self._build_feed_entry(item)
-                # Evitar duplicar el post principal en el feed
+                # El item puede ser directamente el media o contener una clave "media"
+                data = item.get("media") if isinstance(item, dict) and "media" in item else item
+                feed_entry = self._build_feed_entry(data)
                 if feed_entry and feed_entry.get("id") != self.result.get("id"):
                     self.result["feed"].append(feed_entry)
 
@@ -255,18 +252,12 @@ class IgPostParser(BaseParser):
     def _build_feed_entry(self, data: dict) -> dict | None:
         """
         Construye un dict resumido de un ítem del feed lateral del perfil.
-
-        Args:
-            data: dict del ítem del feed extraído de ``xdt_api__v1__profile_timeline.items``.
-
-        Returns:
-            dict con los campos básicos del ítem, o None si no tiene ID.
+        Ahora incluye el timestamp de publicación.
         """
-        post_id = self._safe_get(data, "id")
+        post_id = self._safe_get(data, "id") or self._safe_get(data, "pk")
         if not post_id:
             return None
 
-        # Verificar si ya fue procesado como post principal
         if post_id == self.result.get("id"):
             return None
 
@@ -275,11 +266,9 @@ class IgPostParser(BaseParser):
 
         entry: dict[str, Any] = {
             "post_user_id": post_id,
-            "id": self._safe_get(data, "pk"),
+            "id": self._safe_get(data, "pk") or post_id,
             "code": code,
-            "permalink_url": (
-                f"https://www.instagram.com/p/{code}" if code else self.final_url
-            ),
+            "permalink_url": f"https://www.instagram.com/p/{code}" if code else self.final_url,
             "media_type": self._map_media_type(media_type_raw),
             "text": self._safe_get(data, "caption", "text"),
             "caption": self._safe_get(data, "accessibility_caption"),
@@ -289,6 +278,7 @@ class IgPostParser(BaseParser):
             "image_versions": self._safe_get(data, "image_versions2", "candidates"),
             "video_versions": data.get("video_versions"),
             "user": self._build_user_dict(data.get("user")) if data.get("user") else None,
+            "posted_at": self._parse_timestamp(data.get("taken_at")),   # ← NUEVO
         }
 
         if media_type_raw == 8:
