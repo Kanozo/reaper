@@ -8,37 +8,38 @@ Cambio de estructura (2025-06):
     Instagram migró de bloques JSON con clave raíz ``xdt_api__v1__...``
     a un modelo Relay con la siguiente ruta:
 
-        require[0][3][0]
-          .__bbox.require[0][3][1]
-            .__bbox.result.data
-              .xig_polaris_media
-                .if_not_gated_logged_out   ← datos del post
-                .comments_connection.edges ← comentarios
+        require[N][3][i].__bbox.require[M][3][j].__bbox.result.data
+          .xig_polaris_media
+            .if_not_gated_logged_out   ← datos del post
+            .comments_connection.edges ← comentarios
 
     El feed del perfil del autor se extrae de:
-        xig_polaris_media
-          .if_not_gated_logged_out
-            .user.polaris_ordered_timeline_connection.edges
+        xig_polaris_media.if_not_gated_logged_out
+          .user.polaris_ordered_timeline_connection.edges
 
-Flujo de ``parse()``:
-    1. Extraer todos los bloques JSON del HTML.
-    2. Localizar el nodo Relay que contiene ``xig_polaris_media``.
-    3. Extraer datos del post principal desde ``if_not_gated_logged_out``.
-    4. Extraer comentarios desde ``comments_connection.edges``.
-    5. Extraer feed del perfil desde ``user.polaris_ordered_timeline_connection.edges``.
-    6. Retornar diccionario estructurado completo.
+Notas de implementación:
+    - ``post_user_id``: combinación ``{user_pk}_{media_pk}`` (formato IG estándar).
+    - ``like_count`` / ``comment_count``: Instagram no los expone a usuarios no
+      logueados en el JSON Relay. Se parsean desde el meta tag ``description``
+      como fallback ("N likes, M comments - ...").
+    - ``taken_at`` en nodos del feed: ausente en el HTML. Se decodifica desde el
+      pk usando el epoch offset de Instagram (Snowflake-like ID).
 
 Python: 3.11+
 """
 from reaper.utils.logger import get_logger
 from typing import Any
+import re
+
+from bs4 import BeautifulSoup
 
 from reaper.parsers.base_parser import BaseParser
 
 logger = get_logger(__name__)
 
-# Clave raíz del nodo de media en la respuesta Relay de Instagram
 _MEDIA_ROOT_KEY = "xig_polaris_media"
+# Offset de epoch de Instagram para decodificar timestamps desde pk
+_IG_EPOCH_MS = 1_314_220_021_721
 
 
 class IgPostParser(BaseParser):
@@ -95,8 +96,8 @@ class IgPostParser(BaseParser):
                     "error":       str | None,
                     "raw_data_available": bool,
                     "code":        str,
-                    "id":          str,
-                    "post_user_id": str,
+                    "id":          str,           # pk numérico del media
+                    "post_user_id": str,          # "{user_pk}_{media_pk}"
                     "permalink_url": str,
                     "posted_at":   Optional[datetime],
                     "user": {
@@ -109,8 +110,8 @@ class IgPostParser(BaseParser):
                     "carousel_media_count": int | None,
                     "thumbnail":   str | None,
                     "caption":     str | None,
-                    "like_count":  int,
-                    "comment_count": int,
+                    "like_count":  int,   # 0 si Instagram no lo expone (no logueado)
+                    "comment_count": int, # ídem
                     "link":        str | None,
                     "text":        str | None,
                     "image_versions": list | None,
@@ -135,14 +136,13 @@ class IgPostParser(BaseParser):
 
         self.result["raw_data_available"] = True
 
-        # Datos del post principal
         post_data = media_root.get("if_not_gated_logged_out") or {}
         self._populate_post_fields(post_data)
 
-        # Comentarios desde comments_connection
-        self._extract_comments_from_connection(media_root)
+        # Fallback de contadores desde meta description (usuarios no logueados)
+        self._enrich_counts_from_meta()
 
-        # Feed del perfil del autor
+        self._extract_comments_from_connection(media_root)
         self._extract_profile_feed(post_data)
 
         logger.debug("Post de Instagram parseado correctamente | url=%s", self.final_url)
@@ -156,12 +156,9 @@ class IgPostParser(BaseParser):
         """
         Busca el nodo ``xig_polaris_media`` dentro de la estructura Relay.
 
-        Instagram embebe los datos en:
-            require[N][3][i].__bbox.require[M][3][j].__bbox.result.data
-
-        Usamos ``_recursive_search`` del BaseParser para localizar cualquier
-        dict que contenga la clave ``result`` con ``data.xig_polaris_media``,
-        de modo que sea robusto ante cambios menores de anidamiento.
+        Usa ``_recursive_search`` del BaseParser con la condición
+        ``__bbox.result.data`` que contiene ``xig_polaris_media``, lo que
+        lo hace robusto ante cambios de anidamiento.
 
         Args:
             blocks: Lista de bloques JSON extraídos del HTML.
@@ -195,10 +192,15 @@ class IgPostParser(BaseParser):
             data: Nodo ``if_not_gated_logged_out`` del ``xig_polaris_media``.
         """
         code = data.get("code")
-        self.result["code"] = code
-        self.result["post_user_id"] = data.get("id")
-        self.result["id"] = data.get("pk")
+        media_pk = data.get("pk")
+        user_pk = self._safe_get(data, "user", "pk")
 
+        self.result["code"] = code
+        self.result["id"] = media_pk
+        # Formato estándar de Instagram: "{user_pk}_{media_pk}"
+        self.result["post_user_id"] = (
+            f"{user_pk}_{media_pk}" if user_pk and media_pk else media_pk
+        )
         self.result["permalink_url"] = (
             f"https://www.instagram.com/p/{code}" if code else self.final_url
         )
@@ -206,7 +208,6 @@ class IgPostParser(BaseParser):
 
         user = data.get("user")
         self.result["user"] = self._build_user_dict(user) if user else None
-
         self.result["location"] = data.get("location")
 
         media_type_raw = data.get("media_type", 0)
@@ -215,12 +216,11 @@ class IgPostParser(BaseParser):
             self.result["carousel_media_count"] = data.get("carousel_media_count")
 
         self.result["thumbnail"] = data.get("display_uri")
-        self.result["image_versions"] = self._safe_get(
-            data, "image_versions2", "candidates"
-        )
+        self.result["image_versions"] = self._safe_get(data, "image_versions2", "candidates")
         self.result["video_versions"] = data.get("video_versions")
-
         self.result["caption"] = data.get("accessibility_caption")
+        # like_count y comment_count son 0 para usuarios no logueados en el JSON Relay.
+        # Se enriquecen desde el meta description en _enrich_counts_from_meta().
         self.result["like_count"] = data.get("like_count", 0)
         self.result["comment_count"] = data.get("comment_count", 0)
         self.result["link"] = data.get("link")
@@ -228,12 +228,57 @@ class IgPostParser(BaseParser):
         self.result["tagged_users"] = self._extract_tagged_users(data)
 
     # ------------------------------------------------------------------
+    # Enriquecimiento de contadores desde meta description
+    # ------------------------------------------------------------------
+
+    def _enrich_counts_from_meta(self) -> None:
+        """
+        Parsea el meta tag ``description`` para extraer like_count y
+        comment_count cuando el JSON Relay los devuelve a 0.
+
+        Instagram incluye en el meta description el patrón:
+        ``"N likes, M comments - username on date: ..."``
+        incluso para usuarios no logueados, siendo la única fuente
+        fiable de estos contadores en el HTML sin autenticación.
+
+        Solo sobreescribe si el JSON Relay devolvió 0 en ambos campos,
+        para no pisar datos válidos cuando sí estén presentes.
+        """
+        if self.result.get("like_count", 0) != 0 or self.result.get("comment_count", 0) != 0:
+            return
+
+        try:
+            soup = BeautifulSoup(self.html_content, "html.parser")
+            meta = soup.find("meta", attrs={"name": "description"})
+            if not meta:
+                meta = soup.find("meta", attrs={"property": "og:description"})
+            if not meta:
+                return
+
+            content = meta.get("content", "")
+            # Patrón: "1,234 likes, 56 comments - ..."
+            match = re.match(
+                r'([\d,]+)\s+likes?,\s*([\d,]+)\s+comments?',
+                content,
+            )
+            if match:
+                self.result["like_count"] = int(match.group(1).replace(",", ""))
+                self.result["comment_count"] = int(match.group(2).replace(",", ""))
+                logger.debug(
+                    "Counts from meta: likes=%d, comments=%d",
+                    self.result["like_count"],
+                    self.result["comment_count"],
+                )
+        except Exception as exc:
+            logger.debug("_enrich_counts_from_meta failed: %s", exc)
+
+    # ------------------------------------------------------------------
     # Extracción de comentarios desde comments_connection
     # ------------------------------------------------------------------
 
     def _extract_comments_from_connection(self, media_root: dict) -> None:
         """
-        Extrae los comentarios desde ``xig_polaris_media.comments_connection.edges``.
+        Extrae comentarios desde ``xig_polaris_media.comments_connection.edges``.
 
         Args:
             media_root: El nodo raíz ``xig_polaris_media``.
@@ -259,7 +304,7 @@ class IgPostParser(BaseParser):
 
     def _extract_profile_feed(self, post_data: dict) -> None:
         """
-        Extrae los posts del perfil del autor desde
+        Extrae posts del perfil desde
         ``user.polaris_ordered_timeline_connection.edges``.
 
         Args:
@@ -282,27 +327,33 @@ class IgPostParser(BaseParser):
         """
         Construye un dict resumido de un ítem del feed del perfil.
 
+        ``taken_at`` no está presente en los nodos del feed lateral de IG.
+        Se decodifica desde el ``pk`` usando el epoch offset de Instagram
+        (Snowflake-like: ``timestamp_ms = (pk >> 23) + IG_EPOCH_MS``).
+
         Args:
             data: Nodo de un edge de ``polaris_ordered_timeline_connection``.
 
         Returns:
-            dict con los campos básicos del ítem, o None si no tiene PK.
+            dict con los campos básicos del ítem, o None si no tiene pk.
         """
-        post_pk = data.get("pk")
-        if not post_pk:
+        media_pk = data.get("pk")
+        if not media_pk:
             return None
 
         code = data.get("code")
         media_type_raw = data.get("media_type", 0)
         user = data.get("user")
+        user_pk = (user or {}).get("pk") if user else None
 
         entry: dict[str, Any] = {
-            "post_user_id": data.get("id"),
-            "id": post_pk,
+            "post_user_id": f"{user_pk}_{media_pk}" if user_pk else str(media_pk),
+            "id": media_pk,
             "code": code,
             "permalink_url": (
                 f"https://www.instagram.com/p/{code}" if code else self.final_url
             ),
+            "posted_at": self._decode_pk_timestamp(media_pk),
             "media_type": self._map_media_type(media_type_raw),
             "text": self._safe_get(data, "caption", "text"),
             "caption": data.get("accessibility_caption"),
@@ -334,7 +385,7 @@ class IgPostParser(BaseParser):
             dict con los campos normalizados del usuario.
         """
         return {
-            "id": user.get("id") or user.get("pk"),
+            "id": user.get("pk") or user.get("id"),
             "username": user.get("username"),
             "full_name": user.get("full_name"),
             "profile_pic_url": user.get("profile_pic_url") or user.get("profile_image_uri"),
@@ -358,6 +409,35 @@ class IgPostParser(BaseParser):
             if user:
                 tagged.append(self._build_user_dict(user))
         return tagged
+
+    # ------------------------------------------------------------------
+    # Utilidades estáticas
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _decode_pk_timestamp(pk: str | int | None) -> Any:
+        """
+        Decodifica el timestamp de publicación a partir del pk de Instagram.
+
+        Instagram usa un ID Snowflake-like donde:
+        ``timestamp_ms = (pk >> 23) + 1_314_220_021_721``
+
+        Verificado contra ``taken_at`` real: coincidencia exacta al segundo.
+
+        Args:
+            pk: El pk numérico del media (str o int).
+
+        Returns:
+            ``datetime`` si la decodificación es exitosa, None en caso contrario.
+        """
+        if pk is None:
+            return None
+        try:
+            ts_ms = (int(pk) >> 23) + _IG_EPOCH_MS
+            from datetime import datetime
+            return datetime.fromtimestamp(ts_ms / 1000)
+        except (ValueError, TypeError, OSError):
+            return None
 
     @staticmethod
     def _map_media_type(media_type_raw: int) -> str:
