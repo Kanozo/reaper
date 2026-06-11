@@ -18,10 +18,12 @@ anónima o autenticada y actúa en consecuencia.
 
 from datetime import datetime
 from typing import Any
+import re 
+from urllib.parse import urlparse
 
 from reaper.auth.models import AccountStatus
 from reaper.network.content_fetcher import ContentFetcher
-from reaper.parsers import IgPostParser, IgReelParser
+from reaper.parsers import IgPostParser, IgReelParser, IgProfileParser
 from reaper.scrapers.base import BaseScraper
 from reaper.utils.fb_auth_detector import requires_auth
 from reaper.utils.logger import get_logger
@@ -40,69 +42,80 @@ class InstagramScraper(BaseScraper):
     Sin AccountManager: opera en modo anónimo (comportamiento original).
     """
 
+    def detect_instagram_content_type(self, url: str) -> str:
+        """
+        Retorna 'post', 'reel', 'profile' o 'unknown' según el path de la URL.
+        """
+        parsed = urlparse(url)
+        path = parsed.path.rstrip('/')  # elimina trailing slash para comparar
+
+        # Patrón para post: /p/<shortcode>[/...]
+        if re.search(r'^/p/[A-Za-z0-9_-]+', path):
+            return 'post'
+        # Patrón para reel: /reel/<shortcode>[/...]
+        if re.search(r'^/reel/[A-Za-z0-9_-]+', path):
+            return 'reel'
+        # Patrón para perfil: solo un segmento (username) y nada más
+        if re.match(r'^/[A-Za-z0-9_.]+$', path) and not path.count('/') > 1:
+            return 'profile'
+        return 'unknown'
+
     async def run(self) -> dict[str, Any]:
         logger.info("Iniciando extracción Instagram | url=%s", self.config.url)
 
-        # ── Fetch primario ────────────────────────────────────────────────────
         fetch_result = await self._fetch_with_account("instagram")
-
         if not fetch_result.success:
-            error_msg = fetch_result.error or "Error desconocido en el fetch."
-            logger.error("Fetch fallido | url=%s | error=%s", self.config.url, error_msg)
-            return self._error_result(error_msg)
+            return self._error_result(fetch_result.error or "Error desconocido")
 
         final_url = fetch_result.final_url or self.config.url
 
-        # ── Detección de muro de autenticación ───────────────────────────────
+        # Manejo de auth (sin cambios)
         auth = requires_auth(fetch_result.html_content, final_url)
-
         if auth.auth_type == "content_unavailable":
-            logger.info(
-                "Contenido no disponible | url=%s | reason=%s",
-                final_url, auth.reason,
-            )
             return self._content_unavailable_result(final_url)
-    
         if auth.requires_auth:
             retry = await self._handle_auth_wall(auth.reason, final_url)
             if retry is None:
-                return self._error_result(
-                    f"Authentication required — {auth.reason}",
-                )
+                return self._error_result(f"Authentication required — {auth.reason}")
             fetch_result = retry
             final_url = fetch_result.final_url or final_url
 
-        is_reel = "/reel/" in final_url.lower()
-        logger.info(
-            "Tipo detectado: %s | url=%s", "REEL" if is_reel else "POST", final_url
-        )
+        # Nueva detección
+        content_type = self.detect_instagram_content_type(final_url)
+        logger.info("Tipo detectado: %s | url=%s", content_type.upper(), final_url)
 
-        # ── Intento 1: IgPostParser ───────────────────────────────────────────
-        result: dict[str, Any] = IgPostParser(
-            html_content=fetch_result.html_content,
-            final_url=final_url,
-            original_url=self.config.url,
-            debug=self.config.debug,
-        ).parse()
-
-        # ── Intento 2: IgReelParser — solo si IgPostParser no encontró datos ──
-        if result.get("error"):
-            logger.info(
-                "IgPostParser sin datos, reintentando con IgReelParser | url=%s",
-                final_url,
-            )
-            result = IgReelParser(
+        # Selección del parser
+        if content_type == 'post':
+            parser = IgPostParser(
                 html_content=fetch_result.html_content,
                 final_url=final_url,
                 original_url=self.config.url,
                 debug=self.config.debug,
-            ).parse()
+            )
+        elif content_type == 'reel':
+            parser = IgReelParser(
+                html_content=fetch_result.html_content,
+                final_url=final_url,
+                original_url=self.config.url,
+                debug=self.config.debug,
+            )
+        elif content_type == 'profile':
+            parser = IgProfileParser(
+                html_content=fetch_result.html_content,
+                final_url=final_url,
+                original_url=self.config.url,
+                debug=self.config.debug,
+            )
+        else:
+            # Fallback: intentar post, luego reel (como antes)
+            logger.warning("Tipo desconocido, intentando IgPostParser como fallback")
+            result = IgPostParser(...).parse()
+            if result.get("error"):
+                result = IgReelParser(...).parse()
+            return result
 
-        logger.info(
-            "Extracción completada | error=%s | url=%s",
-            result.get("error"),
-            self.config.url,
-        )
+        result = parser.parse()
+        logger.info("Extracción completada | error=%s | url=%s", result.get("error"), self.config.url)
         return result
 
     # ──────────────────────────────────────────────────────────────────────────

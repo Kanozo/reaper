@@ -32,6 +32,7 @@ from reaper.parsers.facebook.profile_parser import ProfileParser
 from reaper.parsers.facebook.photo_parser import PhotoParser
 from reaper.parsers.instagram.ig_post_parser import IgPostParser
 from reaper.parsers.instagram.ig_reel_parser import IgReelParser
+from reaper.parsers.instagram.ig_profile_parser import IgProfileParser
 
 __all__ = [
     "BaseParser",
@@ -44,4 +45,5 @@ __all__ = [
     "PhotoParser",
     "IgPostParser",
     "IgReelParser",
+    "IgProfileParser"
 ]
