@@ -1,3 +1,35 @@
+"""
+parsers/ig_post_parser.py
+
+Parser para publicaciones regulares de Instagram (fotos, carruseles y vídeos
+publicados bajo la ruta ``/p/``).
+
+Cambio de estructura (2025-06):
+    Instagram migró de bloques JSON con clave raíz ``xdt_api__v1__...``
+    a un modelo Relay con la siguiente ruta:
+
+        require[0][3][0]
+          .__bbox.require[0][3][1]
+            .__bbox.result.data
+              .xig_polaris_media
+                .if_not_gated_logged_out   ← datos del post
+                .comments_connection.edges ← comentarios
+
+    El feed del perfil del autor se extrae de:
+        xig_polaris_media
+          .if_not_gated_logged_out
+            .user.polaris_ordered_timeline_connection.edges
+
+Flujo de ``parse()``:
+    1. Extraer todos los bloques JSON del HTML.
+    2. Localizar el nodo Relay que contiene ``xig_polaris_media``.
+    3. Extraer datos del post principal desde ``if_not_gated_logged_out``.
+    4. Extraer comentarios desde ``comments_connection.edges``.
+    5. Extraer feed del perfil desde ``user.polaris_ordered_timeline_connection.edges``.
+    6. Retornar diccionario estructurado completo.
+
+Python: 3.11+
+"""
 from reaper.utils.logger import get_logger
 from typing import Any
 
@@ -5,17 +37,13 @@ from reaper.parsers.base_parser import BaseParser
 
 logger = get_logger(__name__)
 
+# Clave raíz del nodo de media en la respuesta Relay de Instagram
+_MEDIA_ROOT_KEY = "xig_polaris_media"
+
+
 class IgPostParser(BaseParser):
     """
-    Parser para publicaciones regulares de Instagram (fotos, carruseles y vídeos
-    publicados bajo la ruta ``/p/``).
-
-    Flujo de ``parse()``:
-    1. Extraer todos los bloques JSON del HTML.
-    2. Localizar ``xdt_api__v1__media__shortcode__web_info`` → datos del post principal.
-    3. Extraer metadatos, usuario, tipo de media, adjuntos, comentarios y etiquetas.
-    4. (Opcional) Localizar ``xdt_api__v1__profile_timeline`` → feed de posts del autor.
-    5. Retornar diccionario estructurado completo.
+    Parser para publicaciones regulares de Instagram (fotos, carruseles y vídeos).
 
     Attributes:
         original_url: URL original solicitada por el usuario.
@@ -45,8 +73,6 @@ class IgPostParser(BaseParser):
             debug=debug,
             platform="instagram",
         )
-        # self.original_url y self.result ya inicializados por BaseParser.
-        # Campos específicos de IgPostParser:
         self.result.update({
             "__typename": "regular_post",
             "feed": [],  # posts adicionales del perfil del autor
@@ -58,7 +84,7 @@ class IgPostParser(BaseParser):
 
     def parse(self) -> dict[str, Any]:
         """
-        Ejecuta el pipeline completo de extracción para un post regular de Instagram.
+        Ejecuta el pipeline completo de extracción para un post de Instagram.
 
         Returns:
             dict[str, Any] con la siguiente estructura::
@@ -68,18 +94,18 @@ class IgPostParser(BaseParser):
                     "scraped_at":  datetime,
                     "error":       str | None,
                     "raw_data_available": bool,
-                    "code":        str,          # shortcode del post (ej. "DVQ7dz...")
+                    "code":        str,
                     "id":          str,
-                    "post_user_id":          str,
+                    "post_user_id": str,
                     "permalink_url": str,
                     "posted_at":   Optional[datetime],
                     "user": {
                         "id": str, "username": str, "full_name": str,
-                        "profile_pic_url": str, "is_verified": bool
+                        "profile_pic_url": str, "is_verified": bool,
+                        "is_private": bool
                     },
-                    "group":       Any | None,
                     "location":    Any | None,
-                    "media_type":  str,          # "Photo" | "Reel" | "carousel"
+                    "media_type":  str,
                     "carousel_media_count": int | None,
                     "thumbnail":   str | None,
                     "caption":     str | None,
@@ -91,198 +117,205 @@ class IgPostParser(BaseParser):
                     "video_versions": list | None,
                     "tagged_users": list[dict],
                     "comments":    list[dict],
-                    "feed":        list[dict]    # posts del feed del autor
+                    "feed":        list[dict]
                 }
         """
         logger.info("Iniciando extracción de POST de Instagram | url=%s", self.final_url)
 
-        # Extraer todos los bloques JSON del HTML una sola vez
         blocks = self._extract_json_blocks()
 
-        # --- Paso 1: Post principal ---
-        if not self._extract_main_post(blocks):
+        media_root = self._find_relay_media_root(blocks)
+        if media_root is None:
             self.result["error"] = (
-                "No se encontró el nodo 'xdt_api__v1__media__shortcode__web_info'."
+                f"No se encontró el nodo Relay '{_MEDIA_ROOT_KEY}' "
+                "en ningún bloque JSON del HTML."
             )
             logger.warning("IgPostParser: %s | url=%s", self.result["error"], self.final_url)
             return self.result
 
         self.result["raw_data_available"] = True
 
-        # --- Paso 2: Feed lateral del perfil (datos adicionales opcionales) ---
-        self._extract_feed(blocks)
+        # Datos del post principal
+        post_data = media_root.get("if_not_gated_logged_out") or {}
+        self._populate_post_fields(post_data)
+
+        # Comentarios desde comments_connection
+        self._extract_comments_from_connection(media_root)
+
+        # Feed del perfil del autor
+        self._extract_profile_feed(post_data)
 
         logger.debug("Post de Instagram parseado correctamente | url=%s", self.final_url)
         return self.result
 
     # ------------------------------------------------------------------
+    # Localización del nodo Relay
+    # ------------------------------------------------------------------
+
+    def _find_relay_media_root(self, blocks: list[dict]) -> dict | None:
+        """
+        Busca el nodo ``xig_polaris_media`` dentro de la estructura Relay.
+
+        Instagram embebe los datos en:
+            require[N][3][i].__bbox.require[M][3][j].__bbox.result.data
+
+        Usamos ``_recursive_search`` del BaseParser para localizar cualquier
+        dict que contenga la clave ``result`` con ``data.xig_polaris_media``,
+        de modo que sea robusto ante cambios menores de anidamiento.
+
+        Args:
+            blocks: Lista de bloques JSON extraídos del HTML.
+
+        Returns:
+            El dict ``xig_polaris_media`` si se encuentra, None en caso contrario.
+        """
+        def _is_relay_result(node: dict) -> bool:
+            result = node.get("result")
+            if not isinstance(result, dict):
+                return False
+            data = result.get("data")
+            return isinstance(data, dict) and _MEDIA_ROOT_KEY in data
+
+        for block in blocks:
+            relay_node = self._recursive_search(block, condition=_is_relay_result)
+            if relay_node:
+                return relay_node["result"]["data"][_MEDIA_ROOT_KEY]
+
+        return None
+
+    # ------------------------------------------------------------------
     # Extracción del post principal
     # ------------------------------------------------------------------
 
-    def _extract_main_post(self, blocks: list[dict]) -> bool:
-        """
-        Localiza el nodo ``xdt_api__v1__media__shortcode__web_info`` en los
-        bloques JSON y extrae los datos del post principal.
-
-        Args:
-            blocks: Lista de dicts con todos los bloques JSON del HTML.
-
-        Returns:
-            True si se encontró y procesó el post principal, False en caso contrario.
-        """
-        for block in blocks:
-            # Buscar el nodo raíz que contenga la clave de detalle del post
-            node = self._recursive_search(
-                block,
-                condition=lambda n: bool(n.get("xdt_api__v1__media__shortcode__web_info")),
-            )
-            if not node:
-                continue
-
-            # Navegar hasta el primer ítem (el post principal)
-            items = self._safe_get(
-                node, "xdt_api__v1__media__shortcode__web_info", "items"
-            )
-            if not items or not isinstance(items, list):
-                continue
-
-            data = items[0]
-            self._populate_post_fields(data)
-            return True
-
-        return False
-
     def _populate_post_fields(self, data: dict) -> None:
         """
-        Rellena ``self.result`` con todos los campos del post a partir del
-        nodo de datos del ítem extraído.
-
-        Extrae:
-        - Identificadores (code, id, pk) y URL permanente.
-        - Timestamp de publicación.
-        - Datos del usuario/autor.
-        - Tipo de media y recuento de carrusel (si aplica).
-        - Adjuntos: imágenes y versiones de vídeo.
-        - Texto, caption de accesibilidad, contadores.
-        - Usuarios etiquetados en la publicación.
-        - Comentarios de previsualización.
+        Rellena ``self.result`` con los campos del post.
 
         Args:
-            data: dict del ítem principal extraído de ``items[0]``.
+            data: Nodo ``if_not_gated_logged_out`` del ``xig_polaris_media``.
         """
         code = data.get("code")
         self.result["code"] = code
         self.result["post_user_id"] = data.get("id")
         self.result["id"] = data.get("pk")
 
-        # URL permanente: preferir la canónica con el shortcode
         self.result["permalink_url"] = (
             f"https://www.instagram.com/p/{code}" if code else self.final_url
         )
-
-        # Timestamp Unix → datetime
         self.result["posted_at"] = self._parse_timestamp(data.get("taken_at"))
 
-        # Datos del autor
         user = data.get("user")
         self.result["user"] = self._build_user_dict(user) if user else None
 
-        # Metadatos del post
-        self.result["group"] = data.get("group")
         self.result["location"] = data.get("location")
 
-        # Tipo de media
         media_type_raw = data.get("media_type", 0)
         self.result["media_type"] = self._map_media_type(media_type_raw)
-        if media_type_raw == 8:  # carrusel
+        if media_type_raw == 8:
             self.result["carousel_media_count"] = data.get("carousel_media_count")
 
-        # Adjuntos multimedia
         self.result["thumbnail"] = data.get("display_uri")
         self.result["image_versions"] = self._safe_get(
             data, "image_versions2", "candidates"
         )
         self.result["video_versions"] = data.get("video_versions")
 
-        # Texto y métricas
         self.result["caption"] = data.get("accessibility_caption")
         self.result["like_count"] = data.get("like_count", 0)
         self.result["comment_count"] = data.get("comment_count", 0)
         self.result["link"] = data.get("link")
         self.result["text"] = self._safe_get(data, "caption", "text")
-
-        # Usuarios etiquetados en la publicación
         self.result["tagged_users"] = self._extract_tagged_users(data)
 
-        # Comentarios de previsualización (preview_comments)
-        self.result["comments"] = self._extract_preview_comments(data)
-
     # ------------------------------------------------------------------
-    # Extracción del feed lateral del perfil
+    # Extracción de comentarios desde comments_connection
     # ------------------------------------------------------------------
 
-    def _extract_feed(self, blocks: list[dict]) -> None:
+    def _extract_comments_from_connection(self, media_root: dict) -> None:
         """
-        Localiza el nodo ``xdt_api__v1__profile_timeline`` y extrae la lista
-        de posts adicionales del perfil del autor.
+        Extrae los comentarios desde ``xig_polaris_media.comments_connection.edges``.
+
+        Args:
+            media_root: El nodo raíz ``xig_polaris_media``.
         """
-        for block in blocks:
-            node = self._recursive_search(
-                block,
-                condition=lambda n: bool(n.get("xdt_api__v1__profile_timeline")),
-            )
-            if not node:
-                continue
+        edges = self._safe_get(media_root, "comments_connection", "edges", default=[])
+        comments: list[dict] = []
+        for edge in edges:
+            node = edge.get("node") or {}
+            user = node.get("user") or {}
+            comments.append({
+                "text": node.get("text"),
+                "user": {
+                    "id": user.get("id"),
+                    "username": user.get("username"),
+                    "is_verified": user.get("is_verified", False),
+                },
+            })
+        self.result["comments"] = comments
 
-            timeline = node.get("xdt_api__v1__profile_timeline", {})
-            # La clave puede ser "items" o "profile_grid_items". Se prefiere "profile_grid_items".
-            items = timeline.get("profile_grid_items") or timeline.get("items")
-            if not items or not isinstance(items, list):
-                continue
+    # ------------------------------------------------------------------
+    # Extracción del feed del perfil del autor
+    # ------------------------------------------------------------------
 
-            for item in items:
-                # El item puede ser directamente el media o contener una clave "media"
-                data = item.get("media") if isinstance(item, dict) and "media" in item else item
-                feed_entry = self._build_feed_entry(data)
-                if feed_entry and feed_entry.get("id") != self.result.get("id"):
-                    self.result["feed"].append(feed_entry)
+    def _extract_profile_feed(self, post_data: dict) -> None:
+        """
+        Extrae los posts del perfil del autor desde
+        ``user.polaris_ordered_timeline_connection.edges``.
 
-            break  # Solo procesar el primer bloque que contenga el feed
+        Args:
+            post_data: Nodo ``if_not_gated_logged_out`` del post principal.
+        """
+        edges = self._safe_get(
+            post_data,
+            "user", "polaris_ordered_timeline_connection", "edges",
+            default=[],
+        )
+        main_pk = self.result.get("id")
+
+        for edge in edges:
+            node = edge.get("node") or {}
+            entry = self._build_feed_entry(node)
+            if entry and entry.get("id") != main_pk:
+                self.result["feed"].append(entry)
 
     def _build_feed_entry(self, data: dict) -> dict | None:
         """
-        Construye un dict resumido de un ítem del feed lateral del perfil.
-        Ahora incluye el timestamp de publicación.
+        Construye un dict resumido de un ítem del feed del perfil.
+
+        Args:
+            data: Nodo de un edge de ``polaris_ordered_timeline_connection``.
+
+        Returns:
+            dict con los campos básicos del ítem, o None si no tiene PK.
         """
-        post_id = self._safe_get(data, "id") or self._safe_get(data, "pk")
-        if not post_id:
+        post_pk = data.get("pk")
+        if not post_pk:
             return None
 
-        if post_id == self.result.get("id"):
-            return None
-
-        code = self._safe_get(data, "code")
-        media_type_raw = self._safe_get(data, "media_type", default=0)
+        code = data.get("code")
+        media_type_raw = data.get("media_type", 0)
+        user = data.get("user")
 
         entry: dict[str, Any] = {
-            "post_user_id": post_id,
-            "id": self._safe_get(data, "pk") or post_id,
+            "post_user_id": data.get("id"),
+            "id": post_pk,
             "code": code,
-            "permalink_url": f"https://www.instagram.com/p/{code}" if code else self.final_url,
+            "permalink_url": (
+                f"https://www.instagram.com/p/{code}" if code else self.final_url
+            ),
             "media_type": self._map_media_type(media_type_raw),
             "text": self._safe_get(data, "caption", "text"),
-            "caption": self._safe_get(data, "accessibility_caption"),
-            "display_uri": self._safe_get(data, "display_uri"),
-            "like_count": self._safe_get(data, "like_count", default=0),
-            "comment_count": self._safe_get(data, "comment_count", default=0),
+            "caption": data.get("accessibility_caption"),
+            "display_uri": data.get("display_uri"),
+            "like_count": data.get("like_count", 0),
+            "comment_count": data.get("comment_count", 0),
             "image_versions": self._safe_get(data, "image_versions2", "candidates"),
             "video_versions": data.get("video_versions"),
-            "user": self._build_user_dict(data.get("user")) if data.get("user") else None,
-            "posted_at": self._parse_timestamp(data.get("taken_at")),   # ← NUEVO
+            "user": self._build_user_dict(user) if user else None,
         }
 
         if media_type_raw == 8:
-            entry["carousel_media_count"] = self._safe_get(data, "carousel_media_count")
+            entry["carousel_media_count"] = data.get("carousel_media_count")
 
         return entry
 
@@ -292,67 +325,39 @@ class IgPostParser(BaseParser):
 
     def _build_user_dict(self, user: dict) -> dict[str, Any]:
         """
-        Construye el diccionario de información de un usuario de Instagram.
+        Construye el diccionario normalizado de un usuario de Instagram.
 
         Args:
-            user: dict con los datos del usuario extraídos del JSON.
+            user: dict con los datos del usuario extraídos del nodo Relay.
 
         Returns:
             dict con los campos normalizados del usuario.
         """
         return {
-            "id": user.get("id"),
+            "id": user.get("id") or user.get("pk"),
             "username": user.get("username"),
             "full_name": user.get("full_name"),
-            "profile_pic_url": user.get("profile_pic_url"),
+            "profile_pic_url": user.get("profile_pic_url") or user.get("profile_image_uri"),
             "is_verified": user.get("is_verified", False),
+            "is_private": user.get("is_private", False),
         }
 
     def _extract_tagged_users(self, data: dict) -> list[dict]:
         """
-        Extrae la lista de usuarios etiquetados en la publicación.
-
-        Navega hasta ``usertags.in`` y construye un dict por cada usuario.
+        Extrae los usuarios etiquetados desde ``usertags.in``.
 
         Args:
-            data: dict del ítem del post.
+            data: Nodo de datos del post.
 
         Returns:
             Lista de dicts de usuarios etiquetados (puede estar vacía).
         """
         tagged: list[dict] = []
-        tags = self._safe_get(data, "usertags", "in", default=[])
-        for tag in tags:
+        for tag in self._safe_get(data, "usertags", "in", default=[]):
             user = tag.get("user")
             if user:
                 tagged.append(self._build_user_dict(user))
         return tagged
-
-    def _extract_preview_comments(self, data: dict) -> list[dict]:
-        """
-        Extrae los comentarios de previsualización (``preview_comments``).
-
-        Instagram incluye una muestra de comentarios recientes directamente
-        en el JSON del post, sin necesidad de petición adicional.
-
-        Args:
-            data: dict del ítem del post.
-
-        Returns:
-            Lista de dicts con texto y datos básicos del autor de cada comentario.
-        """
-        comments: list[dict] = []
-        for comment in data.get("preview_comments", []):
-            user = comment.get("user") or {}
-            comments.append({
-                "text": comment.get("text"),
-                "user": {
-                    "id": user.get("id"),
-                    "username": user.get("username"),
-                    "is_verified": user.get("is_verified", False),
-                },
-            })
-        return comments
 
     @staticmethod
     def _map_media_type(media_type_raw: int) -> str:
@@ -360,9 +365,9 @@ class IgPostParser(BaseParser):
         Convierte el código numérico de tipo de media de Instagram a string legible.
 
         Códigos conocidos:
-        - 1 → Photo
-        - 2 → Reel
-        - 8 → carousel
+            - 1 → Photo
+            - 2 → Reel
+            - 8 → carousel
 
         Args:
             media_type_raw: Código numérico del tipo de media.
