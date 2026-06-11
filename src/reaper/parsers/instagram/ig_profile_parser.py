@@ -43,7 +43,6 @@ Python: 3.11+
 """
 from __future__ import annotations
 
-import json
 import re
 from datetime import datetime
 from typing import Any
@@ -55,9 +54,7 @@ from reaper.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Epoch offset de Instagram para Snowflake-like IDs
 _IG_EPOCH_MS: int = 1_314_220_021_721
-# Alfabeto de Instagram para decodificar shortcodes
 _IG_ALPHABET: str = (
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 )
@@ -98,28 +95,25 @@ class IgProfileParser(BaseParser):
             platform="instagram",
         )
         self.result.update({
-            # ── Datos del usuario ────────────────────────────────────────
             "__typename": "instagram_profile",
-            "user_id":        None,   # pk numérico del usuario
-            "username":       None,
-            "full_name":      None,
-            "biography":      None,
-            "category":       None,   # "Digital creator", "Public figure", etc.
+            "user_id": None,
+            "username": None,
+            "full_name": None,
+            "biography": None,
+            "category": None,
             "profile_pic_url": None,
-            "is_verified":    False,
-            "is_private":     False,
+            "is_verified": False,
+            "is_private": False,
             "follower_count": 0,
             "following_count": 0,
-            "posts_count":    0,
-            "website":        None,
-            # ── Grid de posts ────────────────────────────────────────────
+            "posts_count": 0,
+            "website": None,
             "feed": [],
         })
 
     # ------------------------------------------------------------------
-    # Punto de entrada público
+    # Métodos públicos
     # ------------------------------------------------------------------
-
     def parse(self) -> dict[str, Any]:
         """
         Ejecuta el pipeline completo de extracción para un perfil de Instagram.
@@ -174,25 +168,20 @@ class IgProfileParser(BaseParser):
 
         soup = BeautifulSoup(self.html_content, "html.parser")
 
-        # ── Paso 1: Datos del usuario ────────────────────────────────────
         self._extract_user_from_meta(soup)
         self._extract_user_from_html(soup)
         self._extract_user_id_from_json(soup)
+        self._detect_private_account()
 
-        # Verificar que al menos tenemos el username
         if not self.result.get("username"):
             self.result["error"] = (
                 "No se pudo extraer el username del perfil. "
                 "El HTML puede no ser una página de perfil de Instagram válida."
             )
-            logger.warning(
-                "IgProfileParser: %s | url=%s", self.result["error"], self.final_url
-            )
+            logger.warning("IgProfileParser: %s | url=%s", self.result["error"], self.final_url)
             return self.result
 
         self.result["raw_data_available"] = True
-
-        # ── Paso 2: Grid de posts ────────────────────────────────────────
         self._extract_feed_from_html(soup)
 
         logger.debug(
@@ -206,7 +195,6 @@ class IgProfileParser(BaseParser):
     # ------------------------------------------------------------------
     # Extracción de datos del usuario
     # ------------------------------------------------------------------
-
     def _extract_user_from_meta(self, soup: BeautifulSoup) -> None:
         """
         Extrae datos del usuario desde los meta tags de la página.
@@ -226,7 +214,6 @@ class IgProfileParser(BaseParser):
                 self.result["full_name"] = title_match.group(1).strip()
                 self.result["username"] = title_match.group(2).strip()
 
-        # og:url como fallback para username: "https://www.instagram.com/<username>"
         if not self.result.get("username"):
             og_url = soup.find("meta", attrs={"property": "og:url"})
             if og_url:
@@ -237,17 +224,13 @@ class IgProfileParser(BaseParser):
                 if url_match:
                     self.result["username"] = url_match.group(1)
 
-        # og:image → profile_pic_url (fallback; el HTML tiene la URL completa)
         og_image = soup.find("meta", attrs={"property": "og:image"})
         if og_image:
             self.result["profile_pic_url"] = og_image.get("content", "") or None
 
-        # description → "N Followers, M Following, P Posts - Name (@user) on Instagram: "bio""
         desc_meta = soup.find("meta", attrs={"name": "description"})
         if desc_meta:
             desc = desc_meta.get("content", "")
-
-            # Contadores
             counts_match = re.match(
                 r"([\d,]+)\s+Followers?,\s*([\d,]+)\s+Following,\s*([\d,]+)\s+Posts?",
                 desc,
@@ -257,7 +240,6 @@ class IgProfileParser(BaseParser):
                 self.result["following_count"] = int(counts_match.group(2).replace(",", ""))
                 self.result["posts_count"] = int(counts_match.group(3).replace(",", ""))
 
-            # Biografía: texto entre comillas al final
             bio_match = re.search(r'on Instagram:\s*["""](.+?)["""]?\s*$', desc, re.DOTALL)
             if bio_match:
                 self.result["biography"] = bio_match.group(1).strip()
@@ -289,7 +271,7 @@ class IgProfileParser(BaseParser):
             logger.debug("_extract_user_from_html: profile section not found")
             return
 
-        # ── Foto de perfil ───────────────────────────────────────────────
+        # Foto de perfil
         profile_img = profile_section.find(
             "img",
             alt=re.compile(rf"^{re.escape(username)}'s profile picture$", re.I),
@@ -297,78 +279,83 @@ class IgProfileParser(BaseParser):
         if profile_img and profile_img.get("src"):
             self.result["profile_pic_url"] = profile_img["src"]
 
-        # ── Contadores (más recientes que meta tags) ─────────────────────
-        for stat_text, field in [
-            ("posts", "posts_count"),
-            ("followers", "follower_count"),
-            ("following", "following_count"),
-        ]:
-            # Buscar span que contenga "N posts" / "N followers" / "N following"
-            stat_span = profile_section.find(
-                "span", string=re.compile(rf"[\d,]+\s*{stat_text}", re.I)
-            )
-            if not stat_span:
-                # Fallback: span con title numérico cerca de texto con stat_text
-                for span in profile_section.find_all("span", title=True):
-                    title_val = span.get("title", "").replace(",", "")
-                    if title_val.isdigit():
-                        parent_text = span.parent.get_text(strip=True) if span.parent else ""
-                        if stat_text in parent_text.lower():
-                            self.result[field] = int(title_val)
-                            break
-                continue
-            # Extraer número del texto
-            num_match = re.search(r"([\d,]+)", stat_span.get_text())
-            if num_match:
-                self.result[field] = int(num_match.group(1).replace(",", ""))
+        # ----- Contadores mejorados (soporta 62.1K, 5.2M, etc.) -----
+        stats_ul = profile_section.find('ul', class_=re.compile(r'x78zum5 x1q0g3np xod5an3'))
+        if stats_ul:
+            for li in stats_ul.find_all('li'):
+                a = li.find('a')
+                if not a:
+                    continue
+                text = a.get_text(strip=True).lower()
+                if 'posts' in text:
+                    self.result['posts_count'] = self._parse_abbreviated_number(text)
+                elif 'followers' in text:
+                    self.result['follower_count'] = self._parse_abbreviated_number(text)
+                elif 'following' in text:
+                    self.result['following_count'] = self._parse_abbreviated_number(text)
+        else:
+            # Fallback al método original (para páginas con estructura antigua)
+            for stat_text, field in [
+                ("posts", "posts_count"),
+                ("followers", "follower_count"),
+                ("following", "following_count"),
+            ]:
+                stat_span = profile_section.find(
+                    "span", string=re.compile(rf"[\d,]+\s*{stat_text}", re.I)
+                )
+                if stat_span:
+                    num_match = re.search(r"([\d,]+)", stat_span.get_text())
+                    if num_match:
+                        self.result[field] = int(num_match.group(1).replace(",", ""))
 
-        # ── Nombre completo ──────────────────────────────────────────────
-        # Buscar span con el nombre completo (suele estar en un span sin clases
-        # con el nombre visible cerca del username)
+        # Nombre completo
         for span in profile_section.find_all("span"):
             txt = span.get_text(strip=True)
             full_name_candidate = self.result.get("full_name", "")
             if (
                 txt
                 and txt == full_name_candidate
-                and not txt.startswith("x1")  # excluir clases CSS obfuscadas
+                and not txt.startswith("x1")
                 and len(txt) > 2
             ):
                 self.result["full_name"] = txt
                 break
 
-        # ── Biografía ────────────────────────────────────────────────────
-        bio_candidate = self._extract_biography(profile_section, username)
-        if bio_candidate:
-            self.result["biography"] = bio_candidate
+        # Categoría exacta
+        category_elem = profile_section.find('div', class_=re.compile(r'_aacy'))
+        if category_elem:
+            self.result['category'] = category_elem.get_text(strip=True)
+        else:
+            # fallback palabras clave (opcional, se mantiene por compatibilidad)
+            category_keywords = [
+                "Digital creator", "Public figure", "Journalist", "Media",
+                "News", "Photographer", "Artist", "Musician", "Athlete",
+                "Actor", "Blogger", "Business", "Brand", "Organization",
+                "Government", "Community", "Education", "Entertainment",
+                "Food", "Health", "Beauty", "Fashion", "Sports", "Travel",
+            ]
+            section_text = profile_section.get_text()
+            for kw in category_keywords:
+                if kw.lower() in section_text.lower():
+                    self.result["category"] = kw
+                    break
 
-        # ── Categoría ────────────────────────────────────────────────────
-        category_keywords = [
-            "Digital creator", "Public figure", "Journalist", "Media",
-            "News", "Photographer", "Artist", "Musician", "Athlete",
-            "Actor", "Blogger", "Business", "Brand", "Organization",
-            "Government", "Community", "Education", "Entertainment",
-            "Food", "Health", "Beauty", "Fashion", "Sports", "Travel",
-        ]
-        section_text = profile_section.get_text()
-        for kw in category_keywords:
-            if kw.lower() in section_text.lower():
-                self.result["category"] = kw
-                break
+        # Biografía priorizada
+        bio_elem = profile_section.find('span', class_=re.compile(r'_aad7'))
+        if bio_elem:
+            self.result['biography'] = bio_elem.get_text(strip=True)
+        else:
+            bio_candidate = self._extract_biography(profile_section, username)
+            if bio_candidate:
+                self.result["biography"] = bio_candidate
 
-        # ── is_verified ──────────────────────────────────────────────────
-        verified_svg = profile_section.find(
-            "svg",
-            attrs={"aria-label": re.compile(r"verif", re.I)},
-        )
+        # Verificación
+        verified_svg = profile_section.find("svg", attrs={"aria-label": re.compile(r"verif", re.I)})
         if not verified_svg:
-            verified_svg = profile_section.find(
-                "span",
-                attrs={"aria-label": re.compile(r"verif", re.I)},
-            )
+            verified_svg = profile_section.find("span", attrs={"aria-label": re.compile(r"verif", re.I)})
         self.result["is_verified"] = verified_svg is not None
 
-        # ── Website ──────────────────────────────────────────────────────
+        # Website
         excluded_domains = {
             "instagram.com", "meta.com", "meta.ai", "threads.com",
             "facebook.com", "about.meta.com",
@@ -403,30 +390,35 @@ class IgProfileParser(BaseParser):
         """
         # Buscar "user_id" directamente en el raw HTML (más rápido)
         raw = self.html_content
-        user_id_match = re.search(r'"user_id"\s*:\s*"(\d{8,})"', raw)
-        if user_id_match:
-            self.result["user_id"] = user_id_match.group(1)
-            return
-
-        # Fallback: buscar props.id en bloques JSON
-        for tag in soup.find_all("script", {"type": "application/json"}):
-            if not tag.string:
-                continue
-            # Buscar "id":"<N>" donde N es un número largo de usuario
-            id_match = re.search(
-                r'"props"\s*:\s*\{[^}]*"id"\s*:\s*"(\d{8,})"',
-                tag.string,
-            )
-            if id_match:
-                self.result["user_id"] = id_match.group(1)
+        patterns = [
+            r'"user_id"\s*:\s*"(\d+)"',
+            r'"profile_id"\s*:\s*"(\d+)"',
+            r'"props"\s*:\s*\{[^{]*"id"\s*:\s*"(\d+)"',
+            r'"target_id"\s*:\s*"(\d+)"',
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, raw)
+            if match:
+                self.result["user_id"] = match.group(1)
+                logger.debug("user_id encontrado: %s", self.result["user_id"])
                 return
+        logger.debug("_extract_user_id_from_json: user_id no encontrado")
 
-        logger.debug("_extract_user_id_from_json: user_id not found")
+    def _detect_private_account(self) -> None:
+        """Marca la cuenta como privada si aparecen mensajes típicos."""
+        private_markers = [
+            'Esta cuenta es privada',
+            'This account is private',
+            'Private account',
+            'Cuenta privada'
+        ]
+        if any(marker in self.html_content for marker in private_markers):
+            self.result['is_private'] = True
+            logger.debug("Cuenta privada detectada")
 
     # ------------------------------------------------------------------
-    # Extracción del feed (grid de posts)
+    # Extracción del feed
     # ------------------------------------------------------------------
-
     def _extract_feed_from_html(self, soup: BeautifulSoup) -> None:
         """
         Extrae los posts del grid del perfil desde el ``<article>`` del HTML.
@@ -448,7 +440,7 @@ class IgProfileParser(BaseParser):
 
         article = profile_section.find("article")
         if not article:
-            logger.debug("_extract_feed_from_html: <article> not found in section")
+            logger.debug("_extract_feed_from_html: <article> not found")
             return
 
         post_pattern = re.compile(
@@ -471,7 +463,6 @@ class IgProfileParser(BaseParser):
 
             img = a.find("img")
             thumbnail = img.get("src") if img else None
-            # El alt del thumbnail contiene la caption completa del post
             caption_text = img.get("alt") if img else None
 
             pk = self._decode_shortcode(code)
@@ -481,21 +472,19 @@ class IgProfileParser(BaseParser):
 
             feed_entry: dict[str, Any] = {
                 "post_user_id": f"{user_id}_{pk}" if user_id and pk else str(pk or code),
-                "id":           str(pk) if pk else None,
-                "code":         code,
+                "id": str(pk) if pk else None,
+                "code": code,
                 "permalink_url": permalink,
-                "posted_at":    posted_at,
-                "media_type":   media_type,
-                "thumbnail":    thumbnail,
-                "text":         caption_text,
-                "like_count":   0,   # no disponible sin autenticación
-                "comment_count": 0,  # ídem
+                "posted_at": posted_at,
+                "media_type": media_type,
+                "thumbnail": thumbnail,
+                "text": caption_text,
+                "like_count": 0,
+                "comment_count": 0,
             }
             self.result["feed"].append(feed_entry)
 
-        logger.debug(
-            "_extract_feed_from_html: %d posts extraídos", len(self.result["feed"])
-        )
+        logger.debug("_extract_feed_from_html: %d posts extraídos", len(self.result["feed"]))
 
     # ------------------------------------------------------------------
     # Helpers privados
@@ -546,8 +535,6 @@ class IgProfileParser(BaseParser):
             re.I,
         )
         full_name = self.result.get("full_name", "")
-
-        # Recopilar spans de texto candidatos a bio
         candidates: list[str] = []
         for span in profile_section.find_all("span"):
             txt = span.get_text(strip=True)
@@ -556,24 +543,39 @@ class IgProfileParser(BaseParser):
                 and 10 < len(txt) < 500
                 and not excluded_patterns.match(txt)
                 and txt != full_name
-                and not txt.startswith("x1")   # clases CSS obfuscadas
+                and not txt.startswith("x1")
             ):
                 candidates.append(txt)
 
-        # La bio suele aparecer duplicada (versión mobile + desktop)
-        # Devolver la primera aparición única
-        seen: set[str] = set()
-        for candidate in candidates:
-            if candidate not in seen:
-                seen.add(candidate)
-                return candidate
-
+        # Priorizar el texto más largo (la biografía real suele ser la más extensa)
+        if candidates:
+            return max(candidates, key=len)
         return None
 
-    # ------------------------------------------------------------------
-    # Utilidades estáticas
-    # ------------------------------------------------------------------
+    @staticmethod
+    def _parse_abbreviated_number(text: str) -> int:
+        """Convierte '62.1K' → 62100, '5.2M' → 5200000, etc."""
+        text = text.strip().upper().replace(',', '')
+        match = re.match(r'([\d.]+)([KMB]?)', text)
+        if not match:
+            return 0
+        try:
+            num = float(match.group(1))
+        except ValueError:
+            return 0
+        suffix = match.group(2)
+        if suffix == 'K':
+            return int(num * 1000)
+        elif suffix == 'M':
+            return int(num * 1_000_000)
+        elif suffix == 'B':
+            return int(num * 1_000_000_000)
+        else:
+            return int(num)
 
+    # ------------------------------------------------------------------
+    # Utilidades estáticas (sin cambios)
+    # ------------------------------------------------------------------
     @staticmethod
     def _decode_shortcode(code: str) -> int | None:
         """
