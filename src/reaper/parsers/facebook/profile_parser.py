@@ -140,7 +140,7 @@ class ProfileParser(FacebookContentParser):
             self._extract_contact_info() 
             self._extract_timeline_feed()
             self._parse_traffic()
-            logger.indebugfo(
+            logger.debug(
                 "Perfil parseado. Feed: %d posts, Álbumes: %d.",
                 len(self.result["feed"])
             )
