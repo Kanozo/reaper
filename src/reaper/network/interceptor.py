@@ -24,7 +24,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from playwright.async_api import Page, Request, Response
+from playwright.async_api import Page, Request, Route
 
 logger = get_logger(__name__)
 
@@ -91,12 +91,7 @@ class CapturedResponse:
         status:   Código de estado HTTP.
         category: ``"graphql"`` | ``"api"``.
         timestamp: Momento de captura.
-        body:     Body parseado. Facebook puede responder con un único objeto
-                  JSON (``dict``) o con múltiples fragmentos NDJSON /
-                  Incremental Delivery (``list[dict]``). Usar
-                  ``CapturedTraffic.normalize_body(resp.body)`` para obtener
-                  siempre una lista iterable independientemente del formato.
-                  ``None`` si el body está vacío o no es JSON válido.
+        body:     Body parseado como dict. None si no es JSON.
         body_raw: Body crudo como string. Solo en modo debug.
         headers:  Headers HTTP de la respuesta.
     """
@@ -106,8 +101,8 @@ class CapturedResponse:
     category: str
     timestamp: datetime
     # Facebook puede responder con un único objeto JSON (dict) o con múltiples
-    # fragmentos NDJSON / Incremental Delivery (list[dict]). Los parsers deben
-    # normalizar con: bodies = [body] if isinstance(body, dict) else (body or [])
+    # fragmentos NDJSON / Incremental Delivery (list[dict]). Usar siempre
+    # CapturedTraffic.normalize_body(resp.body) para iterar de forma uniforme.
     body: list[dict[str, Any]] | dict[str, Any] | None = None
     body_raw: str | None = None
     headers: dict[str, str] = field(default_factory=dict)
@@ -175,11 +170,9 @@ class CapturedTraffic:
         """
         Normaliza el campo ``body`` de un ``CapturedResponse`` a lista de dicts.
 
-        Facebook puede responder con un único objeto JSON (``dict``) cuando la
-        respuesta es monolítica, o con una lista de fragmentos (``list[dict]``)
-        cuando usa Incremental Delivery / NDJSON. Este helper abstrae esa
-        diferencia para que los parsers y consumidores usen siempre el mismo
-        patrón de iteración::
+        Facebook puede responder con un único objeto JSON (``dict``) o con
+        múltiples fragmentos NDJSON / Incremental Delivery (``list[dict]``).
+        Este helper abstrae esa diferencia::
 
             for fragment in CapturedTraffic.normalize_body(resp.body):
                 data = fragment.get("data", {})
@@ -276,8 +269,20 @@ class NetworkInterceptor:
     """
     Intercepta y categoriza el tráfico de red de una página Playwright.
 
-    Registra listeners para eventos ``request`` y ``response`` en la página
-    y almacena el tráfico de interés en listas tipadas por categoría.
+    Usa dos mecanismos complementarios:
+
+    1. **Listener ``request``** (síncrono): captura metadatos de todas las
+       peticiones (URL, método, headers, body de la request, GraphQL meta).
+       No lee el body de la respuesta.
+
+    2. **``page.route()``** (async): para las URLs de interés (GraphQL /
+       Instagram API), intercepta la petición, hace ``route.fetch()`` para
+       obtener la respuesta con el body **completamente bufferizado** antes de
+       procesarla, y luego la devuelve al browser sin modificaciones.
+
+    Este diseño evita el ``NS_ERROR_FAILURE`` / ``Target closed`` de Firefox
+    que ocurría al llamar a ``response.body()`` desde el evento ``response``
+    (que se dispara cuando llegan los headers, no cuando termina el body).
 
     La intercepción debe activarse ANTES de ``page.goto()`` para capturar
     también las peticiones de la carga inicial de la página.
@@ -305,8 +310,8 @@ class NetworkInterceptor:
         # Si new_events == 0 repetidamente → no hay más contenido
 
     Attributes:
-        debug:              Si True, emite logs de cada request/response.
-        response_body_timeout: Segundos máximos para leer el body de una respuesta.
+        debug:                 Si True, emite logs de cada request/response.
+        response_body_timeout: Segundos máximos para ``route.fetch()``.
     """
 
     #: Patrones que identifican endpoints GraphQL.
@@ -347,24 +352,161 @@ class NetworkInterceptor:
     # API pública
     # ------------------------------------------------------------------
 
-    def attach(self, page: Page) -> None:
+    async def attach(self, page: Page) -> None:
         """
-        Registra los listeners ``request`` y ``response`` en la página.
+        Registra los listeners ``request`` y las routes en la página.
+
+        ``page.route()`` en la API async de Playwright es una coroutine y
+        debe ser awaited. Por eso ``attach`` es async.
+
+        Estrategia de captura de bodies:
+            Para las URLs de interés (GraphQL / Instagram API) se registra un
+            **``page.route()``** que intercepta cada petición, hace
+            ``await route.fetch()`` para obtener la respuesta con el body
+            completamente bufferizado, y la devuelve al browser sin cambios.
+            Esto elimina la race condition de ``response.body()`` en Firefox
+            (NS_ERROR_FAILURE / Target closed).
 
         Debe llamarse **ANTES de ``page.goto()``** para no perder las peticiones
         que se disparan durante la carga inicial.
 
         Args:
             page: Instancia de página de Playwright activa (no navegada aún).
-
-        Notes:
-            - El handler de ``request`` es síncrono (Playwright lo requiere así).
-            - El handler de ``response`` es async (puede usar ``await``).
         """
+        # Listener síncrono de request: captura metadatos de TODAS las peticiones.
+        # page.on() sigue siendo síncrono.
         page.on("request", self._on_request)
-        page.on("response", self._on_response)
+
+        # page.route() es async en la API async de Playwright → await obligatorio.
+        for pattern in self._route_patterns():
+            await page.route(pattern, self._on_route)
+
         if self.debug:
             logger.debug("NetworkInterceptor adjunto a la página.")
+
+    def _route_patterns(self) -> list[str]:
+        """
+        Genera los patrones glob de Playwright para registrar routes.
+
+        Playwright route() acepta strings con ``*`` y ``**``:
+            - ``**/api/graphql/**`` captura Facebook GraphQL.
+            - ``**/api/graphql``    captura sin trailing slash.
+
+        Returns:
+            Lista de patrones glob para cubrir todos los endpoints de interés.
+        """
+        return [
+            "**/api/graphql",
+            "**/api/graphql/**",
+            "**/graphql/query",
+            "**/graphql/query/**",
+            "**/api/v1/**",
+            "**/i.instagram.com/api/**",
+        ]
+
+    async def _on_route(self, route: Route) -> None:
+        """
+        Route handler que captura requests + responses con body garantizado.
+
+        Llama a ``route.fetch()`` para obtener la respuesta del servidor con
+        el body completamente bufferizado antes de procesarla. Esto evita el
+        problema de NS_ERROR_FAILURE / Target closed de Firefox que ocurre
+        cuando se intenta leer ``response.body()`` desde el evento ``response``
+        (que se dispara cuando llegan los headers, no cuando termina el body).
+
+        Flujo:
+            1. ``route.fetch()`` → realiza la petición y espera el body completo.
+            2. Leer y parsear el body de ``api_response``.
+            3. ``route.fulfill()`` → devolver la respuesta al browser sin
+               modificaciones, para que la página funcione con normalidad.
+
+        El ``CapturedRequest`` ya fue creado por ``_on_request`` (listener
+        síncrono que se dispara antes). Este método solo crea el
+        ``CapturedResponse`` correspondiente.
+
+        Args:
+            route: Objeto Route de Playwright.
+        """
+        request = route.request
+        url = request.url
+        category = self._categorize(url)
+
+        if category is None:
+            # URL no relevante que llegó al route handler (no debería ocurrir
+            # con los patrones actuales, pero manejarlo por seguridad)
+            await route.continue_()
+            return
+
+        body: list[dict[str, Any]] | dict[str, Any] | None = None
+        body_raw: str | None = None
+        status = 200
+        response_headers: dict[str, str] = {}
+
+        try:
+            async with asyncio.timeout(self.response_body_timeout):
+                api_response = await route.fetch()
+
+            status = api_response.status
+            response_headers = dict(api_response.headers)
+
+            # Sólo leer body si el status puede tenerlo
+            if status not in self._NO_BODY_STATUS_CODES:
+                raw_bytes = await api_response.body()
+                if raw_bytes:
+                    body_raw = raw_bytes.decode("utf-8", errors="replace")
+                    body = self._parse_response_body(body_raw)
+
+            # Devolver la respuesta al browser sin modificar
+            await route.fulfill(response=api_response)
+
+        except asyncio.TimeoutError:
+            logger.debug("Timeout en route.fetch() para: %s", url[:60])
+            await route.continue_()
+            return
+        except Exception as exc:
+            err_str = str(exc)
+            # "Target closed" ocurre si el browser se cierra mientras
+            # esperamos el fetch — es esperado al cerrar la sesión
+            if "Target closed" in err_str or "closed" in err_str.lower():
+                logger.debug("Route abortado (target cerrado): %s", url[:60])
+            else:
+                logger.debug("Error en route handler (%s): %s", url[:60], exc)
+            # Intentar continuar normalmente para no romper la navegación
+            try:
+                await route.continue_()
+            except Exception:
+                pass
+            return
+
+        captured = CapturedResponse(
+            url=url,
+            status=status,
+            category=category,
+            timestamp=datetime.now(),
+            body=body,
+            body_raw=body_raw if self.debug else None,
+            headers=response_headers,
+        )
+
+        self._store_response(captured, category)
+        self._activity_count += 1
+
+        if self.debug:
+            body_label = f" [body: {len(body_raw)}chars]" if body_raw else " [sin body]"
+            logger.debug(
+                "↓ [%s] %d %s%s",
+                category.upper(),
+                status,
+                url[:80],
+                body_label,
+            )
+
+    # Códigos HTTP que nunca llevan body según RFC 7230.
+    _NO_BODY_STATUS_CODES: frozenset[int] = frozenset({
+        100, 101, 102, 103,
+        204,
+        304,
+    })
 
     def get_traffic(self) -> CapturedTraffic:
         """
@@ -499,143 +641,6 @@ class NetworkInterceptor:
                 else ""
             )
             logger.debug("↑ [%s]%s %s %s", category.upper(), meta_label, request.method, url[:80])
-
-    # Códigos HTTP que nunca llevan body según RFC 7230.
-    # Intentar leer body en estos casos siempre falla con NS_ERROR_FAILURE en Firefox.
-    _NO_BODY_STATUS_CODES: frozenset[int] = frozenset({
-        100, 101, 102, 103,   # 1xx Informational
-        204,                   # No Content
-        304,                   # Not Modified
-    })
-
-    async def _on_response(self, response: Response) -> None:
-        """
-        Handler asíncrono para cada respuesta de red.
-
-        Espera explícitamente a que el body esté completamente descargado
-        antes de intentar leerlo, evitando el ``NS_ERROR_FAILURE`` de Firefox
-        causado por leer un stream aún no bufferizado.
-
-        Flujo de lectura:
-            1. Descartar si el status no lleva body (1xx, 204, 304).
-            2. Descartar si el Content-Type no es JSON/JavaScript ni es una
-               categoría de interés (graphql/api).
-            3. ``await response.finished()`` con timeout — espera a que el
-               transport layer confirme que el body está completo.
-            4. ``await response.body()`` con timeout — lee los bytes.
-            5. Parsear con ``_parse_response_body()`` (JSON simple o NDJSON).
-
-        Facebook puede responder en dos formatos:
-            - **JSON simple**: ``{"data": {...}}`` → body es ``dict``.
-            - **NDJSON / Incremental Delivery**: múltiples objetos separados
-              por newlines → body es ``list[dict]``.
-
-        Args:
-            response: Objeto Response de Playwright.
-        """
-        url = response.url
-        category = self._categorize(url)
-        if category is None:
-            return
-
-        body: list[dict[str, Any]] | dict[str, Any] | None = None
-        body_raw: str | None = None
-
-        try:
-            # ── Paso 1: descartar status sin body ────────────────────────
-            if response.status in self._NO_BODY_STATUS_CODES:
-                logger.debug(
-                    "Respuesta sin body (status=%d): %s", response.status, url[:60]
-                )
-            else:
-                content_type = response.headers.get("content-type", "")
-                should_read = (
-                    "json" in content_type
-                    or "javascript" in content_type
-                    or category in ("graphql", "api")
-                )
-
-                if should_read:
-                    raw_bytes: bytes | None = None
-
-                    # ── Paso 2: esperar a que el body esté completamente
-                    #            descargado en el buffer del navegador.
-                    #            response.finished() retorna None si OK o
-                    #            un string de error si el download falló.
-                    #            Sin este await, response.body() lanza
-                    #            NS_ERROR_FAILURE en Firefox. ────────────
-                    try:
-                        async with asyncio.timeout(self.response_body_timeout):
-                            finish_error = await response.finished()
-                    except asyncio.TimeoutError:
-                        logger.debug(
-                            "Timeout esperando finished() para: %s", url[:60]
-                        )
-                        finish_error = "timeout"
-
-                    if finish_error:
-                        # El navegador reportó un error de descarga (red cortada,
-                        # abort, timeout interno…). No intentar leer el body.
-                        logger.debug(
-                            "response.finished() reportó error en %s: %s",
-                            url[:60],
-                            finish_error,
-                        )
-                    else:
-                        # ── Paso 3: leer bytes con timeout independiente ──────
-                        try:
-                            async with asyncio.timeout(self.response_body_timeout):
-                                raw_bytes = await response.body()
-                        except asyncio.TimeoutError:
-                            logger.debug(
-                                "Timeout leyendo body de: %s", url[:60]
-                            )
-                            raw_bytes = None
-                        except Exception as body_exc:
-                            # Errores residuales (muy raros después de finished())
-                            # Distinguir NS_ERROR_FAILURE del resto para diagnóstico.
-                            err_str = str(body_exc)
-                            if "NS_ERROR_FAILURE" in err_str or "NS_ERROR" in err_str:
-                                logger.debug(
-                                    "Firefox NS_ERROR leyendo body (ignorado): %s — %s",
-                                    url[:60], err_str[:80],
-                                )
-                            else:
-                                logger.debug(
-                                    "Error leyendo body de %s: %s", url[:60], body_exc
-                                )
-                            raw_bytes = None
-
-                    # ── Paso 4: decodificar y parsear ────────────────────
-                    if raw_bytes:
-                        body_raw = raw_bytes.decode("utf-8", errors="replace")
-                        body = self._parse_response_body(body_raw)
-
-        except Exception as exc:
-            logger.debug("Error inesperado en response handler (%s): %s", url[:60], exc)
-
-        captured = CapturedResponse(
-            url=url,
-            status=response.status,
-            category=category,
-            timestamp=datetime.now(),
-            body=body,
-            body_raw=body_raw if self.debug else None,
-            headers=dict(response.headers),
-        )
-
-        self._store_response(captured, category)
-        self._activity_count += 1
-
-        if self.debug:
-            body_label = f" [body: {len(body_raw)}chars]" if body_raw else " [sin body]"
-            logger.debug(
-                "↓ [%s] %d %s%s",
-                category.upper(),
-                response.status,
-                url[:80],
-                body_label,
-            )
 
     # ------------------------------------------------------------------
     # Helpers privados

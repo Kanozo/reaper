@@ -477,7 +477,7 @@ class ContentFetcher:
 
                 # ADJUNTAR ANTES DE NAVEGAR: garantiza que no se pierden
                 # las peticiones de la carga inicial de la página.
-                interceptor.attach(page)
+                await interceptor.attach(page)
 
                 if not await self._navigate(page):
                     await browser.close()

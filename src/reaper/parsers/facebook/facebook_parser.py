@@ -388,6 +388,16 @@ class FacebookContentParser(BaseParser):
             Lista con un único dict con los metadatos del vídeo.
         """
         media = self._safe_get(style, "attachment", "media") or {}
+
+        captions_locales = media.get("video_available_captions_locales")
+        captions = []
+        for caption_item in captions_locales:
+            if caption_item.get("locale") in {"en_US", "es_ES"} or caption_item.get("localized_language") in {"English", "Español"}:
+                caption_item["captions_url"] = srt_to_dict(
+                    get_text_from_url(caption_item.get("captions_url"))
+                )
+                captions.append(caption_item)
+                
         return [
             {
                 "type": media.get("__typename"),
@@ -396,7 +406,7 @@ class FacebookContentParser(BaseParser):
                     media, "videoDeliveryLegacyFields", "browser_native_sd_url",
                     default="",
                 ),
-                "caption": media.get("video_available_captions_locales"),
+                "caption": captions,
                 "thumbnail_url": self._safe_get(
                     media, "thumbnailImage", "uri", default=""
                 ),

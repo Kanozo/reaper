@@ -214,4 +214,4 @@ def _normalize_url(url: str) -> tuple[str, str]:
     except Exception:
         return "/", ""
     
-#print (get_parser_from_fb_url("https://www.facebook.com/CiberCubaNoticias/photos/su-mam%C3%A1-la-vio-y-rompi%C3%B3-a-llorar-%EF%B8%8Fcibercuba-te-lo-explica-una-cubana-regres%C3%B3-por/1451544977018022/"))
+#print (get_parser_from_fb_url("https://www.facebook.com/profile.php?id=100079458018484"))

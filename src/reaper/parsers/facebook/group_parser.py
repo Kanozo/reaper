@@ -8,7 +8,7 @@ from reaper.parsers.facebook.facebook_parser import FacebookContentParser
 logger = get_logger(__name__)
 
 # Patrones de operaciones GraphQL relevantes para grupos
-_GROUP_GRAPHQL_OPERATIONS = ["GroupHome", "GroupAbout", "GroupMembers"]
+_GROUP_GRAPHQL_OPERATIONS = ["GroupHome", "GroupAbout", "GroupMembers", "GroupsCometFeedRegularStoriesPaginationQuery"]
 
 # Regex para parsear el conteo de miembros desde texto (ej. "1.200 miembros")
 _MEMBER_COUNT_PATTERN = re.compile(
@@ -53,7 +53,7 @@ class GroupParser(FacebookContentParser):
         self._group_about: dict | None = None
         self._group_header: dict | None = None
         self.result.update({
-            "__typename": "about_private_group",
+            "__typename": "facebook_group",
             "group_url": self.original_url,
             "requested_post_id": self._extract_post_id_from_url(self.original_url),
             "content_gated": False,

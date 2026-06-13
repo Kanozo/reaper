@@ -729,9 +729,174 @@ class ProfileParser(FacebookContentParser):
             )
         }
 
+    # ==================================================================
+    # TRÁFICO GRAPHQL
+    # ==================================================================
+
     def _parse_traffic(self) -> None:
-        """Enriquece ``self.result`` con metadatos del tráfico GraphQL del perfil."""
-        self._parse_facebook_traffic(operation_patterns=_PROFILE_GRAPHQL_OPERATIONS)
+        """Enriquece ``self.result["feed"]`` con posts adicionales del tráfico GraphQL.
+
+        Facebook carga el timeline del perfil de forma paginada mediante XHR.
+        El HTML inicial sólo contiene los primeros posts del feed; los
+        siguientes llegan a través de la operación GraphQL
+        ``ProfileCometTimelineFeedRefetchQuery`` (y variantes) capturada
+        por el interceptor durante el auto-scroll.
+
+        Flujo:
+            1. Filtrar respuestas GraphQL relevantes por nombre de operación.
+            2. Por cada respuesta, normalizar el body con
+               ``CapturedTraffic.normalize_body`` (resuelve dict vs list[dict]).
+            3. Buscar recursivamente nodos ``Story`` dentro de cada fragmento.
+            4. Deduplicar por ``post_id`` evitando duplicar posts ya en el feed.
+            5. Construir el dict del post con ``_build_feed_post_dict``.
+
+        Nota:
+            Facebook usa **Incremental Delivery** (multipart/mixed o NDJSON)
+            para algunas respuestas GraphQL de timeline. En esos casos el
+            interceptor almacena el body como ``list[dict]`` (un dict por
+            fragmento). ``normalize_body`` abstrae esta diferencia.
+        """
+        if not self._has_graphql_traffic():
+            logger.debug("_parse_traffic: sin tráfico GraphQL disponible.")
+            return
+
+        # IDs ya en el feed (desde HTML) para deduplicar
+        seen_ids: set[str] = {
+            str(p.get("id") or p.get("post_id", ""))
+            for p in self.result["feed"]
+            if p.get("id") or p.get("post_id")
+        }
+
+        traffic_posts_added = 0
+
+        for operation in _PROFILE_GRAPHQL_OPERATIONS:
+            # _get_graphql_response_by_operation ya retorna los bodies
+            # directamente (list[dict|list[dict]]), no CapturedResponse.
+            bodies = self._get_graphql_response_by_operation(operation)
+            if not bodies:
+                continue
+
+            logger.debug(
+                "_parse_traffic: %d bodies para '%s'",
+                len(bodies), operation,
+            )
+
+            for body in bodies:
+                # normalize_body resuelve dict | list[dict] → list[dict]
+                for fragment in CapturedTraffic.normalize_body(body):
+                    added = self._process_traffic_fragment(fragment, seen_ids)
+                    traffic_posts_added += added
+
+        logger.debug(
+            "_parse_traffic: %d posts añadidos desde tráfico GraphQL.",
+            traffic_posts_added,
+        )
+
+    def _process_traffic_fragment(
+        self,
+        fragment: dict[str, Any],
+        seen_ids: set[str],
+    ) -> int:
+        """Extrae y añade posts de un único fragmento JSON del tráfico GraphQL.
+
+        Un fragmento puede ser la respuesta completa (monolítica) o uno de
+        los fragmentos del Incremental Delivery de Facebook. En ambos casos
+        la estructura interna es la misma: el cursor de paginación y los
+        edges ``Story`` viven bajo ``data.node.timeline_list_feed_units``.
+
+        Args:
+            fragment: Un dict de la respuesta GraphQL (ya normalizado).
+            seen_ids: Set de post_ids ya procesados para deduplicación.
+                      Se modifica in-place al añadir nuevos posts.
+
+        Returns:
+            Número de posts añadidos desde este fragmento.
+        """
+        added = 0
+
+        # Facebook puede anidar los datos bajo "data.node", "data.user",
+        # "data.viewer" o directamente bajo "data" dependiendo de la operación.
+        data_root = fragment.get("data") or {}
+
+        # Buscar el nodo que contiene timeline_list_feed_units
+        # en cualquier profundidad del fragmento
+        timeline_node = self._recursive_search(
+            data_root,
+            condition=lambda n: (
+                "timeline_list_feed_units" in n
+                and isinstance(n.get("timeline_list_feed_units"), dict)
+            ),
+        )
+
+        if not timeline_node:
+            # Fallback: buscar Story nodes directamente en el fragmento completo
+            # (ocurre en respuestas parciales de Incremental Delivery)
+            story_nodes = self._find_all_nodes(
+                data_root,
+                condition=lambda n: (
+                    n.get("__typename") == "Story"
+                    and ("post_id" in n or "id" in n)
+                    and "comet_sections" in n
+                ),
+            )
+            for story in story_nodes:
+                added += self._add_story_to_feed(story, seen_ids)
+            return added
+
+        # Procesar edges del nodo timeline
+        edges = self._safe_get(
+            timeline_node, "timeline_list_feed_units", "edges", default=[]
+        )
+        for edge in (edges or []):
+            story = edge.get("node") or {}
+            if story.get("__typename") != "Story":
+                continue
+            added += self._add_story_to_feed(story, seen_ids)
+
+        # Cursor de paginación (útil para debug/futuras expansiones)
+        page_info = self._safe_get(
+            timeline_node, "timeline_list_feed_units", "page_info"
+        )
+        if page_info and self.debug:
+            logger.debug(
+                "  page_info: has_next=%s, end_cursor=%s",
+                page_info.get("has_next_page"),
+                str(page_info.get("end_cursor", ""))[:20],
+            )
+
+        return added
+
+    def _add_story_to_feed(
+        self,
+        story: dict[str, Any],
+        seen_ids: set[str],
+    ) -> int:
+        """Construye un post desde un nodo Story y lo añade al feed si no es duplicado.
+
+        Args:
+            story:    Nodo Story del GraphQL de tráfico.
+            seen_ids: Set mutable de IDs ya procesados.
+
+        Returns:
+            1 si el post fue añadido, 0 si era duplicado o inválido.
+        """
+        post_id = str(story.get("post_id") or story.get("id", ""))
+        if not post_id or post_id in seen_ids:
+            return 0
+
+        seen_ids.add(post_id)
+
+        try:
+            post_dict = self._build_feed_post_dict(story)
+            post_dict.setdefault("is_pinned", False)
+            self.result["feed"].append(post_dict)
+            return 1
+        except Exception as exc:
+            logger.debug(
+                "_add_story_to_feed: error construyendo post_id=%s: %s",
+                post_id, exc,
+            )
+            return 0
 
     def _extract_intro_card_info(self) -> None:
         """Extrae educación, ciudad actual y lugar de origen del perfil."""
