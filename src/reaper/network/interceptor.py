@@ -91,7 +91,12 @@ class CapturedResponse:
         status:   Código de estado HTTP.
         category: ``"graphql"`` | ``"api"``.
         timestamp: Momento de captura.
-        body:     Body parseado como dict. None si no es JSON.
+        body:     Body parseado. Facebook puede responder con un único objeto
+                  JSON (``dict``) o con múltiples fragmentos NDJSON /
+                  Incremental Delivery (``list[dict]``). Usar
+                  ``CapturedTraffic.normalize_body(resp.body)`` para obtener
+                  siempre una lista iterable independientemente del formato.
+                  ``None`` si el body está vacío o no es JSON válido.
         body_raw: Body crudo como string. Solo en modo debug.
         headers:  Headers HTTP de la respuesta.
     """
@@ -100,7 +105,10 @@ class CapturedResponse:
     status: int
     category: str
     timestamp: datetime
-    body: dict[str, Any] | dict[str, Any] | None = None
+    # Facebook puede responder con un único objeto JSON (dict) o con múltiples
+    # fragmentos NDJSON / Incremental Delivery (list[dict]). Los parsers deben
+    # normalizar con: bodies = [body] if isinstance(body, dict) else (body or [])
+    body: list[dict[str, Any]] | dict[str, Any] | None = None
     body_raw: str | None = None
     headers: dict[str, str] = field(default_factory=dict)
 
@@ -116,8 +124,8 @@ class CapturedTraffic:
     Uso desde parsers::
 
         for resp in result.traffic.graphql_responses:
-            if resp.body:
-                data = resp.body.get("data", {})
+            for fragment in CapturedTraffic.normalize_body(resp.body):
+                data = fragment.get("data", {})
 
         search_responses = result.traffic.graphql_by_operation("SearchResultsPage")
 
@@ -159,6 +167,36 @@ class CapturedTraffic:
             and operation_name in req.graphql_meta.friendly_name
         }
         return [resp for resp in self.graphql_responses if resp.url in matching_urls]
+
+    @staticmethod
+    def normalize_body(
+        body: "list[dict[str, Any]] | dict[str, Any] | None",
+    ) -> "list[dict[str, Any]]":
+        """
+        Normaliza el campo ``body`` de un ``CapturedResponse`` a lista de dicts.
+
+        Facebook puede responder con un único objeto JSON (``dict``) cuando la
+        respuesta es monolítica, o con una lista de fragmentos (``list[dict]``)
+        cuando usa Incremental Delivery / NDJSON. Este helper abstrae esa
+        diferencia para que los parsers y consumidores usen siempre el mismo
+        patrón de iteración::
+
+            for fragment in CapturedTraffic.normalize_body(resp.body):
+                data = fragment.get("data", {})
+
+        Args:
+            body: El campo ``body`` de un ``CapturedResponse``.
+
+        Returns:
+            Lista de dicts (vacía si body es None o tipo inesperado).
+        """
+        if body is None:
+            return []
+        if isinstance(body, dict):
+            return [body]
+        if isinstance(body, list):
+            return [item for item in body if isinstance(item, dict)]
+        return []
 
     @property
     def total_requests(self) -> int:
@@ -462,12 +500,35 @@ class NetworkInterceptor:
             )
             logger.debug("↑ [%s]%s %s %s", category.upper(), meta_label, request.method, url[:80])
 
+    # Códigos HTTP que nunca llevan body según RFC 7230.
+    # Intentar leer body en estos casos siempre falla con NS_ERROR_FAILURE en Firefox.
+    _NO_BODY_STATUS_CODES: frozenset[int] = frozenset({
+        100, 101, 102, 103,   # 1xx Informational
+        204,                   # No Content
+        304,                   # Not Modified
+    })
+
     async def _on_response(self, response: Response) -> None:
         """
         Handler asíncrono para cada respuesta de red.
 
-        Lee el body con timeout configurable para no bloquear en respuestas
-        lentas o de streaming.
+        Espera explícitamente a que el body esté completamente descargado
+        antes de intentar leerlo, evitando el ``NS_ERROR_FAILURE`` de Firefox
+        causado por leer un stream aún no bufferizado.
+
+        Flujo de lectura:
+            1. Descartar si el status no lleva body (1xx, 204, 304).
+            2. Descartar si el Content-Type no es JSON/JavaScript ni es una
+               categoría de interés (graphql/api).
+            3. ``await response.finished()`` con timeout — espera a que el
+               transport layer confirme que el body está completo.
+            4. ``await response.body()`` con timeout — lee los bytes.
+            5. Parsear con ``_parse_response_body()`` (JSON simple o NDJSON).
+
+        Facebook puede responder en dos formatos:
+            - **JSON simple**: ``{"data": {...}}`` → body es ``dict``.
+            - **NDJSON / Incremental Delivery**: múltiples objetos separados
+              por newlines → body es ``list[dict]``.
 
         Args:
             response: Objeto Response de Playwright.
@@ -477,32 +538,81 @@ class NetworkInterceptor:
         if category is None:
             return
 
-        body: dict[str, Any] | None = None
+        body: list[dict[str, Any]] | dict[str, Any] | None = None
         body_raw: str | None = None
 
         try:
-            content_type = response.headers.get("content-type", "")
-            should_read = (
-                "json" in content_type
-                or "javascript" in content_type
-                or category in ("graphql", "api")
-            )
+            # ── Paso 1: descartar status sin body ────────────────────────
+            if response.status in self._NO_BODY_STATUS_CODES:
+                logger.debug(
+                    "Respuesta sin body (status=%d): %s", response.status, url[:60]
+                )
+            else:
+                content_type = response.headers.get("content-type", "")
+                should_read = (
+                    "json" in content_type
+                    or "javascript" in content_type
+                    or category in ("graphql", "api")
+                )
 
-            if should_read:
-                # asyncio.timeout() es preferible a asyncio.wait_for() en Python 3.11+.
-                try:
-                    async with asyncio.timeout(self.response_body_timeout):
-                        raw_bytes = await response.body()
-                except asyncio.TimeoutError:
-                    logger.debug("Timeout leyendo body de respuesta: %s", url[:60])
-                    raw_bytes = None
+                if should_read:
+                    raw_bytes: bytes | None = None
 
-                if raw_bytes:
-                    body_raw = raw_bytes.decode("utf-8", errors="replace")
-                    body = self._parse_response_body(body_raw)
+                    # ── Paso 2: esperar a que el body esté completamente
+                    #            descargado en el buffer del navegador.
+                    #            response.finished() retorna None si OK o
+                    #            un string de error si el download falló.
+                    #            Sin este await, response.body() lanza
+                    #            NS_ERROR_FAILURE en Firefox. ────────────
+                    try:
+                        async with asyncio.timeout(self.response_body_timeout):
+                            finish_error = await response.finished()
+                    except asyncio.TimeoutError:
+                        logger.debug(
+                            "Timeout esperando finished() para: %s", url[:60]
+                        )
+                        finish_error = "timeout"
+
+                    if finish_error:
+                        # El navegador reportó un error de descarga (red cortada,
+                        # abort, timeout interno…). No intentar leer el body.
+                        logger.debug(
+                            "response.finished() reportó error en %s: %s",
+                            url[:60],
+                            finish_error,
+                        )
+                    else:
+                        # ── Paso 3: leer bytes con timeout independiente ──────
+                        try:
+                            async with asyncio.timeout(self.response_body_timeout):
+                                raw_bytes = await response.body()
+                        except asyncio.TimeoutError:
+                            logger.debug(
+                                "Timeout leyendo body de: %s", url[:60]
+                            )
+                            raw_bytes = None
+                        except Exception as body_exc:
+                            # Errores residuales (muy raros después de finished())
+                            # Distinguir NS_ERROR_FAILURE del resto para diagnóstico.
+                            err_str = str(body_exc)
+                            if "NS_ERROR_FAILURE" in err_str or "NS_ERROR" in err_str:
+                                logger.debug(
+                                    "Firefox NS_ERROR leyendo body (ignorado): %s — %s",
+                                    url[:60], err_str[:80],
+                                )
+                            else:
+                                logger.debug(
+                                    "Error leyendo body de %s: %s", url[:60], body_exc
+                                )
+                            raw_bytes = None
+
+                    # ── Paso 4: decodificar y parsear ────────────────────
+                    if raw_bytes:
+                        body_raw = raw_bytes.decode("utf-8", errors="replace")
+                        body = self._parse_response_body(body_raw)
 
         except Exception as exc:
-            logger.debug("Error en response handler (%s): %s", url[:60], exc)
+            logger.debug("Error inesperado en response handler (%s): %s", url[:60], exc)
 
         captured = CapturedResponse(
             url=url,

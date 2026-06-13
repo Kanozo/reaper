@@ -702,33 +702,150 @@ class ContentFetcher:
         """
         Scroll automático midiendo cambios de ``scrollHeight`` del contenedor.
 
-        Con anti-detección activa sustituye ``mouse.wheel`` + ``asyncio.sleep``
-        fijo por ``human_scroll()`` (ráfagas variables con micro-pausas internas)
-        y añade comportamiento idle y distracciones ocasionales entre iteraciones.
+        Determina el **target de scroll** siguiendo esta lógica:
 
-        Estrategia:
-            1. Localiza ``div[role='dialog']`` y obtiene su bounding box.
-            2. Posiciona el cursor en el centro superior del contenedor.
-            3. En cada iteración hace scroll humano y compara ``scrollHeight``.
-            4. Si ``scrollHeight`` no cambia por ``NO_CHANGE_THRESHOLD``
-               iteraciones consecutivas, detiene el scroll.
+        1. Si no existe ``div[role='dialog']`` → scroll sobre la **página**.
+        2. Si existe y es un **auth dialog** (login/sign-up wall):
+        → cierra el dialog → scroll sobre la **página**.
+        3. Si existe y es un **content dialog** (post, reel, comentarios…):
+        → scroll sobre el **dialog**.
+
+        Detección de auth dialog (señales independientes, OR lógico):
+            1. ``input[type="password"]`` — universal, no depende de idioma.
+            2. ``form[action*="login"]``  — específico de Meta/FB.
+            3. ``input[name="email"]`` o ``input[name="pass"]``.
+
+        Botón de cierre del auth dialog: ``[role='button']`` con ``aria-label``
+        que coincida con cualquiera de las traducciones conocidas de "cerrar".
+        Fallback: primer ``[role='button']`` visible cuyo label no sea acción
+        de contenido (Like, Comment, Share…).
+
+        Con anti-detección activa sustituye ``mouse.wheel`` + ``asyncio.sleep``
+        fijo por ``human_scroll()`` y añade comportamiento idle y distracciones
+        ocasionales entre iteraciones.
 
         Args:
             page: Página de Playwright activa (con interceptor ya adjunto).
         """
+        _AUTH_SELECTORS: tuple[str, ...] = (
+            'input[type="password"]',
+            'form[action*="login"]',
+            'input[name="email"]',
+            'input[name="pass"]',
+        )
+        _CLOSE_ARIA_LABELS: frozenset[str] = frozenset({
+            "close", "cerrar", "fermer", "schließen", "chiudi",
+            "fechar", "закрыть", "닫기", "关闭", "閉じる",
+        })
+        _ACTION_ARIA_LABELS: frozenset[str] = frozenset({
+            "like", "comment", "share", "log in", "create new account",
+            "me gusta", "comentar", "compartir",
+        })
+
         try:
+            # ── Determinar target de scroll ──────────────────────────────────
             container = page.locator('div[role="dialog"]')
             bbox = await container.bounding_box()
 
-            if not bbox:
-                logger.warning("Contenedor no encontrado; auto-scroll omitido.")
-                return
+            # scroll_on_page=True  → wheel sobre viewport + scrollHeight del document
+            # scroll_on_page=False → wheel sobre el dialog   + scrollHeight del dialog
+            scroll_on_page: bool = bbox is None  # default: no hay dialog → página
 
-            center_x = bbox["x"] + bbox["width"] / 2
-            start_y = bbox["y"] + 100
-            await page.mouse.move(center_x, start_y)
-            logger.debug("Cursor en X=%.0f, Y=%.0f", center_x, start_y)
+            if bbox is not None:
+                # Hay dialog — determinar si es auth
+                is_auth_dialog = False
+                for selector in _AUTH_SELECTORS:
+                    try:
+                        if await container.locator(selector).count() > 0:
+                            is_auth_dialog = True
+                            logger.debug(
+                                "Auth dialog detectado via selector '%s'.", selector
+                            )
+                            break
+                    except Exception:
+                        continue
 
+                if is_auth_dialog:
+                    # ── Cerrar el auth dialog ────────────────────────────────
+                    close_btn = None
+
+                    # Intento 1: aria-label de cierre conocido
+                    for btn in await container.locator("[role='button'][aria-label]").all():
+                        try:
+                            label = (
+                                await btn.get_attribute("aria-label") or ""
+                            ).lower().strip()
+                            if label in _CLOSE_ARIA_LABELS:
+                                close_btn = btn
+                                logger.debug(
+                                    "Botón close encontrado: aria-label=%r", label
+                                )
+                                break
+                        except Exception:
+                            continue
+
+                    # Intento 2 (fallback): primer botón visible no-acción
+                    if close_btn is None:
+                        for btn in await container.locator("[role='button']").all():
+                            try:
+                                if not await btn.is_visible():
+                                    continue
+                                label = (
+                                    await btn.get_attribute("aria-label") or ""
+                                ).lower().strip()
+                                if label and label not in _ACTION_ARIA_LABELS:
+                                    close_btn = btn
+                                    logger.debug(
+                                        "Botón close (fallback): aria-label=%r", label
+                                    )
+                                    break
+                            except Exception:
+                                continue
+
+                    if close_btn is not None:
+                        if self.cfg.USE_ANTI_DETECTION:
+                            btn_bbox = await close_btn.bounding_box()
+                            if btn_bbox:
+                                cx = btn_bbox["x"] + btn_bbox["width"] / 2
+                                cy = btn_bbox["y"] + btn_bbox["height"] / 2
+                                await page.mouse.move(cx, cy)
+                                await micro_delay(80, 150)
+                        await close_btn.click()
+                        logger.debug(
+                            "Auth dialog cerrado. Continuando scroll sobre la página."
+                        )
+                    else:
+                        logger.warning(
+                            "Auth dialog detectado pero no se encontró botón de cierre; "
+                            "scroll sobre la página de todos modos."
+                        )
+
+                    # En ambos casos (cerrado o no) el scroll va sobre la página
+                    scroll_on_page = True
+
+                # else: content dialog → scroll_on_page permanece False
+
+            # ── Posicionar cursor y configurar evaluador de altura ───────────
+            if scroll_on_page:
+                # Mover cursor al centro del viewport para que wheel actúe sobre él
+                viewport = page.viewport_size or {"width": 1280, "height": 720}
+                center_x = viewport["width"] / 2
+                start_y = viewport["height"] / 2
+                await page.mouse.move(center_x, start_y)
+                get_scroll_height = "document.documentElement.scrollHeight"
+                logger.debug(
+                    "Scroll sobre PÁGINA | cursor X=%.0f, Y=%.0f", center_x, start_y
+                )
+            else:
+                center_x = bbox["x"] + bbox["width"] / 2
+                start_y = bbox["y"] + 100
+                await page.mouse.move(center_x, start_y)
+                get_scroll_height = "el => el.scrollHeight"
+                logger.debug(
+                    "Scroll sobre DIALOG | cursor X=%.0f, Y=%.0f", center_x, start_y
+                )
+
+            # ── Bucle de scroll ──────────────────────────────────────────────
             last_height = 0
             no_change_count = 0
             iteration = 0
@@ -737,16 +854,17 @@ class ContentFetcher:
 
             while iteration < self.cfg.MAX_SCROLL_ITERATIONS:
                 if self.cfg.USE_ANTI_DETECTION:
-                    # human_scroll gestiona internamente los delays entre ráfagas,
-                    # simulando la rueda del ratón de forma irregular.
                     await human_scroll(page, direction="down", amount=self.cfg.SCROLL_DELTA)
-                    # Micro-pausa adicional mientras el DOM procesa el scroll.
                     await micro_delay(150, int(self.cfg.SCROLL_WAIT_TIME * 1000))
                 else:
                     await page.mouse.wheel(0, self.cfg.SCROLL_DELTA)
                     await asyncio.sleep(self.cfg.SCROLL_WAIT_TIME)
 
-                current_height = await container.evaluate("el => el.scrollHeight")
+                # Medir altura según el target activo
+                if scroll_on_page:
+                    current_height = await page.evaluate(get_scroll_height)
+                else:
+                    current_height = await container.evaluate(get_scroll_height)
 
                 if current_height == last_height:
                     no_change_count += 1
@@ -762,24 +880,19 @@ class ContentFetcher:
                     no_change_count = 0
                     height_delta = current_height - last_height
                     last_height = current_height
-                    logger.debug("scrollHeight: %dpx (+%dpx)", current_height, height_delta)
-
-                    # Pausa proporcional al contenido recién cargado: el usuario lee
-                    # lo que acaba de aparecer. Estimación: ~1 palabra cada 15px de
-                    # delta (heurístico conservador para texto + imágenes intercaladas).
+                    logger.debug(
+                        "scrollHeight: %dpx (+%dpx)", current_height, height_delta
+                    )
                     if self.cfg.USE_ANTI_DETECTION:
                         words_visible = max(20, height_delta // 15)
                         await simulate_reading_pause(page, words_visible)
 
-                # Distracción ocasional (15% por iteración): el usuario aparta
-                # brevemente el cursor del área de contenido.
                 if self.cfg.USE_ANTI_DETECTION and random.random() < 0.15:
                     await simulate_distraction(page)
                     await page.mouse.move(center_x, start_y)
 
                 iteration += 1
 
-            # Pausa final mientras el usuario termina de leer el contenido cargado.
             if self.cfg.USE_ANTI_DETECTION:
                 await simulate_idle(page, random.uniform(0.8, 1.5))
             else:

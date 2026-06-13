@@ -23,6 +23,7 @@ _PROFILE_GRAPHQL_OPERATIONS = [
     "ProfileCometAboutAppSectionQuery",
     "ProfileCometPhotosTabQuery",
     "CometUFICommentsProviderQuery",
+    "ProfileCometTimelineFeedRefetchQuery"
 ]
 
 # Patrones para detectar la red social de una URL o handle
@@ -141,8 +142,7 @@ class ProfileParser(FacebookContentParser):
             self._extract_timeline_feed()
             self._parse_traffic()
             logger.debug(
-                "Perfil parseado. Feed: %d posts, Álbumes: %d.",
-                len(self.result["feed"])
+                f"Perfil parseado. Feed: {len(self.result["feed"])} posts",
             )
         except Exception as exc:
             self.result["error"] = str(exc)
