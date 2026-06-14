@@ -89,7 +89,6 @@ class ProfileParser(FacebookContentParser):
         self.result.update({
             "__typename": "facebook_user_profile",
             "profile_url": self.original_url,
-            "feed": [],
             "education":    {"text": "", "name": "", "url": "", "id": ""},
             "current_city": {"text": "", "name": "", "url": "", "id": ""},
             "hometown":     {"text": "", "name": "", "url": "", "id": ""},
@@ -99,6 +98,8 @@ class ProfileParser(FacebookContentParser):
                 "websites":        [],
                 "social_accounts": [],
             },
+            "feed": [],
+            "photos": [],          # fotos de la sección Photos del perfil
         })
 
     # ==================================================================
@@ -138,7 +139,8 @@ class ProfileParser(FacebookContentParser):
             self._extract_social_metrics()
             self._extract_delegate_page()
             self._extract_intro_card_info()
-            self._extract_contact_info() 
+            self._extract_contact_info()
+            self._extract_photos_section()
             self._extract_timeline_feed()
             self._parse_traffic()
             logger.debug(
@@ -706,27 +708,106 @@ class ProfileParser(FacebookContentParser):
 
         # Comments count
         comments_count = (
-            self._safe_get(feedback, "total_comment_count", default=0)
+            self._safe_get(feedback, 
+                           "comment_rendering_instance",
+                           'comments',
+                           'total_count',
+                           default=0)
             or self._safe_get(
                 story,
                 "comet_sections", "feedback", "story",
                 "story_ufi_container", "story",
                 "feedback_context", "feedback_target_with_context",
-                "comment_list_renderer", "feedback",
-                "comment_rendering_instance_for_feed_location", "comments",
+                "comment_rendering_instance", "comments",
                 "total_count",
                 default=0,
             )
             or 0
         )
+        comments = self._extract_comments(story)
 
         return {
             "reaction_count": reaction_count,
             "reactions": reactions,
-            "comments_count": comments_count,
             "share_count": self._safe_get(
                 feedback, "share_count", "count", default=0
+            ),
+            "comments_count": comments_count,
+            "comments": comments
+        }
+    
+    def _extract_comments(self, story) -> None:
+        """Extrae los comentarios visibles en el HTML del post.
+
+        Los comentarios adicionales cargados dinámicamente se añaden
+        después en ``_parse_traffic`` desde el tráfico GraphQL.
+
+        Actualiza ``self.result["comments"]`` in-place.
+        """
+        comments = []
+
+        comments_node = self._safe_get(
+            story,
+            "comet_sections", "feedback", "story",
+            "story_ufi_container", "story",
+            "feedback_context",
+            'interesting_top_level_comments'
+        )
+
+        for edge in comments_node:
+            node = edge.get("comment", {})
+            if node:
+                comments.append(self._build_comment_dict(node))
+        return comments
+
+    def _build_comment_dict(self, node: dict) -> dict[str, Any]:
+        """Construye el diccionario normalizado de un comentario.
+
+        Args:
+            node: Nodo de comentario extraído del grafo de Facebook.
+
+        Returns:
+            Dict normalizado con los campos del comentario:
+                ``id``, ``depth``, ``text``, ``created_at``, ``author``,
+                ``replies_count``, ``reactions``, ``reaction_count``.
+        """
+        author = node.get("author", {})
+        author_id = author.get("id", "")
+
+        reactions = [
+            {
+                "id": self._safe_get(edge, "node", "id"),
+                "count": edge.get("reaction_count", 0),
+            }
+            for edge in self._safe_get(
+                node, "feedback", "top_reactions", "edges", default=[]
             )
+        ]
+
+        return {
+            "id": node.get("legacy_fbid"),
+            "depth": node.get("depth", 0),
+            "text": self._safe_get(node, "body", "text"),
+            "created_at": self._parse_timestamp(node.get("created_time")),
+            "author": {
+                "id": author_id,
+                "name": author.get("name", ""),
+                "profile_url": (
+                    author.get("url")
+                    or f"https://www.facebook.com/profile.php?id={author_id}"
+                ),
+                "gender": author.get("gender", ""),
+                "avatar": self._safe_get(
+                    author, "profile_picture_depth_0_increased", "uri"
+                ),
+            },
+            "replies_count": self._safe_get(
+                node, "feedback", "total_reply_count", default=0
+            ),
+            "reactions": reactions,
+            "reaction_count": self._safe_get(
+                node, "feedback", "reactors", "count_reduced", default=0
+            ),
         }
 
     # ==================================================================
@@ -1015,6 +1096,95 @@ class ProfileParser(FacebookContentParser):
                         }
                         if entry not in contact["social_accounts"]:
                             contact["social_accounts"].append(entry)
+
+    def _extract_photos_section(self) -> None:
+        """Extrae las fotos de la sección «Photos» visible en el perfil.
+
+        Facebook renderiza en el sidebar del perfil una cuadrícula con las
+        fotos más recientes del usuario (típicamente 9). Cada foto aparece
+        como ``<a href="/photo/?fbid=...">`` con una ``<img>`` thumbnail
+        dentro, bajo un ``<h2>`` con texto "Photos".
+
+        Estructura extraída por foto::
+
+            {
+                "photo_id":       str,        # fbid numérico
+                "photo_url":      str,        # URL canónica en Facebook
+                "thumbnail_url":  str | None, # URL CDN 
+            }
+
+        Adicionalmente extrae ``photos_section_url`` (link "See all photos")
+        y lo almacena directamente en ``self.result``.
+
+        Actualiza ``self.result["photos"]`` in-place.
+        """
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(self.html_content, "html.parser")
+        _PHOTO_HREF = re.compile(r"/photo/\?fbid=(\d+)")
+
+        # Localizar el <h2> con texto exacto "Photos" y subir hasta el
+        # contenedor que agrupa las fotos (máximo 12 niveles).
+        photos_container = None
+        for h2 in soup.find_all("h2"):
+            if h2.get_text(strip=True) == "Photos":
+                node = h2
+                for _ in range(12):
+                    node = node.parent
+                    if node is None:
+                        break
+                    if node.find_all("a", href=_PHOTO_HREF):
+                        photos_container = node
+                        break
+                if photos_container:
+                    break
+
+        if not photos_container:
+            logger.debug("_extract_photos_section: sección Photos no encontrada.")
+            return
+
+        # Extraer URL "See all photos"
+        for a in photos_container.find_all("a", href=True):
+            href = a.get("href", "")
+            txt = a.get_text(strip=True).lower()
+            if "/photos" in href and "photo/?fbid=" not in href and "all" in txt:
+                self.result["photos_section_url"] = href
+                break
+
+        # Procesar cada foto de la cuadrícula
+        seen_fbids: set[str] = set()
+        photos: list[dict[str, Any]] = []
+
+        for a in photos_container.find_all("a", href=_PHOTO_HREF):
+            href = a.get("href", "")
+            m = _PHOTO_HREF.search(href)
+            if not m:
+                continue
+
+            fbid = m.group(1)
+            if fbid in seen_fbids:
+                continue
+            seen_fbids.add(fbid)
+
+            photo_url = f"https://www.facebook.com/photo/?fbid={fbid}"
+            thumbnail_url: str | None = None
+
+            img = a.find("img")
+            if img:
+                src = img.get("src", "")
+                if src:
+                    thumbnail_url = src
+
+            photos.append({
+                "photo_id":       fbid,
+                "photo_url":      photo_url,
+                "thumbnail_url":  thumbnail_url,
+            })
+
+        self.result["photos"] = photos
+        logger.debug(
+            "_extract_photos_section: %d fotos extraídas.", len(photos)
+        )
 
     @staticmethod
     def _clean_fb_redirect_url(url: str) -> str:
