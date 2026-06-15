@@ -428,13 +428,14 @@ class IgReelParser(BaseParser):
 
         Returns:
             ``datetime`` si la decodificación es exitosa, None en caso contrario.
-        """
+        """     
         if pk is None:
             return None
         try:
             ts_ms = (int(pk) >> 23) + _IG_EPOCH_MS
             from datetime import datetime
-            return datetime.fromtimestamp(ts_ms / 1000)
+            dt = datetime.fromtimestamp(ts_ms / 1000)
+            return dt.strftime("%Y-%m-%dT%H:%M:%S")
         except (ValueError, TypeError, OSError):
             return None
 
