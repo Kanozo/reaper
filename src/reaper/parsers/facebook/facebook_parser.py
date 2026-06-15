@@ -82,12 +82,14 @@ class FacebookContentParser(BaseParser):
         if not actors and fallback_path:
             actors = self._safe_get(story, *fallback_path)
 
+        
         if actors and isinstance(actors, list) and len(actors) > 0:
             actor = actors[0]
             author_id = self._safe_get(actor, "id", default="unknown")
+            author_name = self._safe_get(actor, "name") or self._safe_get(story, 'comet_sections', 'context_layout', 'story', 'comet_sections', 'actor_photo', 'story', 'actors')[0]['name'] or "unknow"
             return {
                 "id": author_id,
-                "name": self._safe_get(actor, "name", default="Unknown"),
+                "name": author_name,
                 "url": (
                     actor.get("url")
                     or f"https://www.facebook.com/profile.php?id={author_id}"

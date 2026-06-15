@@ -85,30 +85,18 @@ class GroupParser(FacebookContentParser):
             "__typename":       "facebook_group",
             "group_url":        self.original_url,
             "requested_post_id": self._extract_post_id_from_url(self.original_url),
-            "content_gated":    False,
             "id":               None,
             "name":             None,
             "url":              None,
             "vanity":           None,
             "description":      None,
-            "privacy": {
-                "level":       "",
-                "description": "",
-                "icon":        "",
-                "is_private":  False,
-            },
-            "cover_photo":      {},
-            "total_members_text": "",
+            "is_private":       False,
+            "baner":      {},
             "total_members":    0,
             "posts_last_day":   0,
             "created_at":       None,
             "admins":           [],
             "admins_count":     0,
-            "content_views":    [],   # tabs disponibles en el grupo
-            "viewer": {
-                "join_state": "",
-                "is_member":  False,
-            },
             "highlight_post_ids": [],  # posts destacados (featured)
             "photos":           [],    # fotos recientes (recent media)
             "feed":             [],    # posts del feed
@@ -149,15 +137,14 @@ class GroupParser(FacebookContentParser):
             self._extract_cover_photo()
             self._extract_description()
             self._extract_member_count()
-            self._extract_content_views()
-            self._extract_viewer()
+
             self._extract_history()
             self._extract_activity_metrics()
             self._extract_admins()
+
             self._extract_highlight_posts()
             self._extract_feed_from_blocks()
             self._extract_photos_from_html()
-            self._determine_content_gating()
             self._parse_traffic()
             logger.info(
                 "Grupo parseado | name=%s feed=%d photos=%d",
@@ -311,12 +298,7 @@ class GroupParser(FacebookContentParser):
         pi = (self._node_header or {}).get("privacy_info") or {}
         if pi:
             level = self._safe_get(pi, "title", "text", default="")
-            self.result["privacy"] = {
-                "level":       level,
-                "description": self._safe_get(pi, "description", "text", default=""),
-                "icon":        pi.get("icon_name", ""),
-                "is_private":  level.lower() in ("private", "privado", "private group"),
-            }
+            self.result["is_private"] = level.lower() in ("private", "privado", "private group")
             return
 
         # Fuente 2: about_info_items (about page)
@@ -325,14 +307,7 @@ class GroupParser(FacebookContentParser):
                 continue
             privacy_info = self._safe_get(item, "group", "privacy_info") or {}
             level = self._safe_get(privacy_info, "label", "text", default="")
-            self.result["privacy"] = {
-                "level":       level,
-                "description": self._safe_get(
-                    privacy_info, "description", "text", default=""
-                ),
-                "icon":        privacy_info.get("icon_name", ""),
-                "is_private":  level.lower() in ("private", "privado"),
-            }
+            self.result["is_private"] = level.lower() in ("private", "privado")
             break
 
     def _extract_cover_photo(self) -> None:
@@ -349,10 +324,9 @@ class GroupParser(FacebookContentParser):
             return
 
         image = photo.get("image") or {}
-        self.result["cover_photo"] = {
+        self.result["baner"] = {
             "photo_id": photo.get("id"),
             "cdn_uri":  image.get("uri"),
-            "cdn_base": image.get("uri", "").split("?")[0] if image.get("uri") else None,
             "width":    image.get("width"),
             "height":   image.get("height"),
         }
@@ -404,7 +378,6 @@ class GroupParser(FacebookContentParser):
             self._node_header, "group_member_profiles", "formatted_count_text"
         )
         if fmt:
-            self.result["total_members_text"] = fmt
             self.result["total_members"] = self._parse_member_count(fmt)
             return
 
@@ -413,58 +386,7 @@ class GroupParser(FacebookContentParser):
             self._node_about, "if_viewer_can_see_activity_section"
         ) or {}
         text = activity.get("group_total_members_info_text") or ""
-        self.result["total_members_text"] = text
         self.result["total_members"] = self._parse_member_count(text)
-
-    def _extract_content_views(self) -> None:
-        """Extrae los tabs de contenido del grupo (content_views).
-
-        Lee ``_node_header.group_content_views.edges`` y construye la
-        lista de tabs disponibles con tipo, título y URI.
-
-        Actualiza ``self.result["content_views"]`` in-place.
-        """
-        edges = self._safe_get(
-            self._node_header, "group_content_views", "edges", default=[]
-        ) or []
-        tabs = []
-        for edge in edges:
-            if not isinstance(edge, dict):
-                continue
-            node = edge.get("node") or {}
-            uri = node.get("content_view_uri")   # puede ser None (tab activo)
-            tabs.append({
-                "type":       node.get("content_view_type"),
-                "title":      node.get("content_view_title"),
-                "uri":        uri,
-                "url": (
-                    f"https://www.facebook.com{uri}"
-                    if isinstance(uri, str) and uri.startswith("/")
-                    else uri
-                ),
-                "is_default": node.get("is_default_selected_content_view", False),
-            })
-        self.result["content_views"] = tabs
-
-    def _extract_viewer(self) -> None:
-        """Extrae el estado del viewer respecto al grupo.
-
-        Usa ``viewer_join_state`` del header y presencia de
-        ``if_viewer_can_see_content`` del about.
-
-        Actualiza ``self.result["viewer"]`` in-place.
-        """
-        join_state = (self._node_header or {}).get("viewer_join_state") or ""
-        # if_viewer_can_see_content presente → es miembro
-        can_see = (self._node_about or {}).get("if_viewer_can_see_content")
-        # También puede venir del main node (home)
-        if can_see is None:
-            can_see = (self._node_main or {}).get("if_viewer_can_see_content")
-
-        self.result["viewer"] = {
-            "join_state": join_state,
-            "is_member":  can_see is not None,
-        }
 
     def _extract_history(self) -> None:
         """Extrae la fecha de creación del grupo (solo desde about page).
@@ -525,16 +447,16 @@ class GroupParser(FacebookContentParser):
             "highlight_units",
         ) or {}
         edges = hu.get("edges") or []
-        post_ids = []
+        highlight_posts = []
         for edge in edges:
             if not isinstance(edge, dict):
                 continue
             story = self._safe_get(edge, "node", "story") or {}
-            pid = self._find_post_id_in_story(story)
-            if pid and pid not in post_ids:
-                post_ids.append(pid)
-        self.result["highlight_post_ids"] = post_ids
-        logger.debug("Highlight posts: %d", len(post_ids))
+            post = self._build_highlight_post_dict(story)
+            highlight_posts.append(post)
+            
+        self.result["highlight_posts"] = highlight_posts
+        logger.debug("Highlight posts: %d", len(highlight_posts))
 
     # ==================================================================
     # FEED (posts del grupo)
@@ -666,6 +588,93 @@ class GroupParser(FacebookContentParser):
             "comment_count":  comment_count,
             "share_count":    share_count,
         }
+
+    def _build_highlight_post_dict(self, story: dict) -> dict[str, Any]:
+        """Construye el diccionario normalizado de un post del grupo.
+
+        Extrae datos de las secciones ``comet_sections.timestamp``,
+        ``comet_sections.content.story`` y ``comet_sections.feedback``.
+        Si el post es un share, el mensaje real está en ``attached_story``.
+
+        Args:
+            story: Nodo Story completo del JSON.
+
+        Returns:
+            dict con los campos del post.
+        """
+        cs = story.get("comet_sections") or {}
+
+        # ── Timestamp ────────────────────────────────────────────────
+        metadata = self._safe_get(story, 'comet_sections',
+                                       'context_layout', 'story', 'comet_sections',
+                                       'metadata')
+        node_time = self._recursive_search(data=metadata, 
+                                               condition=lambda n: n.get("__typename") == "CometFeedStoryMinimizedTimestampStrategy",
+                                           )
+        creation_time = None
+        if node_time:
+            creation_time = self._safe_get(node_time, 'story', 'creation_time')
+            
+        # ── Content story ────────────────────────────────────────────
+        content_story = self._safe_get(cs, "content", "story") or {}
+        post_id = story.get("post_id") or content_story.get("post_id")
+
+        # ── Acutor ────────────────────────────────────────────────────
+        author = self._extract_author_common(story)
+
+        # ── Message ──────────────────────────────────────────────────
+        # Para posts propios: content_story.message
+        # Para shares: content_story.attached_story.message
+        msg_text = self._safe_get(content_story, "message", "text") or ""
+        if not msg_text:
+            attached = content_story.get("attached_story") or {}
+            msg_text = self._safe_get(attached, "message", "text") or ""
+
+        # ── Attachments / fotos del post ─────────────────────────────
+        attachments = self._extract_attachments_common(story)
+        # También en attached_story
+        if not attachments:
+            attached = content_story.get("attached_story") or {}
+            attachments = attached.get("attachments") or []
+
+        #media_items = self._extract_media_from_attachments(attachments)
+        post_url = f"{self.result.get('group_url')}/posts/{post_id}/"
+        # ── Reactions / engagement ───────────────────────────────────
+        reaction_count, comment_count, share_count = self._extract_counts(story)
+        Feedback = self._extract_feedback_common(story)
+        return {
+            "__typename":     "highlight_post",
+            "id":             str(post_id) if post_id else None,
+            "post_url":       post_url,
+            "permalink_url":  self._safe_get(story, "url", default=""),
+            "posted_at":      self._parse_timestamp(creation_time),
+
+            "author":         author,
+            "text":           msg_text,
+
+            "attachments":    attachments,
+            "reaction_count": reaction_count,
+            "comments_count": comment_count,
+            "share_count":    share_count,
+        }
+    
+        # "author": {
+        #         "id": "100059022512747",
+        #         "name": "Ikan Elenu Oni Chango",
+        #         "profile_url": "https://www.facebook.com/iyawo.ikanlenu",
+        #         "gender": "FEMALE",
+        #         "avatar": "https://scontent.fptp4-1.fna.fbcdn.net/v/t39.30808-1/685603340_1327784542532284_673774723795755494_n.jpg?stp=c0.69.1080.1080a_cp0_dst-jpg_tt6&cstp=mx1080x1080&ctp=s40x40&_nc_cat=102&ccb=1-7&_nc_sid=1d2534&_nc_ohc=ePYWBrbP8_wQ7kNvwHZ_MMO&_nc_oc=AdqGmacybaAtEQ2xEYhJKs1UA6NSaVFB0nmtMImwARUXQBoscPFOLXSQMpoFRXepC3A&_nc_zt=24&_nc_ht=scontent.fptp4-1.fna&_nc_gid=OFf0VqdEnrQEfscafCsoTw&_nc_ss=70289&oh=00_Af8Z9bctYHrJBSbOPUz--U0N_d20Fa6m8rTWrURTi-lJlg&oe=6A33CD0E"
+        #     }
+
+        # "reactions": [
+        #     {
+        #         "id": "115940658764963",
+        #         "type": "Haha",
+        #         "count": 1537
+        #     }
+        # ],
+        # "hashtags": [],
+        # "mentions": [],
 
     def _extract_media_from_attachments(
         self, attachments: list
@@ -954,23 +963,6 @@ class GroupParser(FacebookContentParser):
                     added += 1
 
         return added
-
-    # ==================================================================
-    # GATING
-    # ==================================================================
-
-    def _determine_content_gating(self) -> None:
-        """Determina si el contenido solicitado está bloqueado.
-
-        El contenido está gateado cuando se solicitó un post específico,
-        el grupo es privado y el viewer no es miembro.
-
-        Actualiza ``self.result["content_gated"]`` in-place.
-        """
-        post_id   = self.result.get("requested_post_id")
-        is_private = self.result.get("privacy", {}).get("is_private", False)
-        is_member  = self.result.get("viewer", {}).get("is_member", False)
-        self.result["content_gated"] = bool(post_id and is_private and not is_member)
 
     # ==================================================================
     # HELPERS PRIVADOS

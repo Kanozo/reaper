@@ -324,7 +324,6 @@ class ProfileParser(FacebookContentParser):
         cover = header.get("cover_photo") or {}
         photo = cover.get("photo") or {}
         image = photo.get("image") or {}
-
         self.result["banner"] = {
             "image_uri": image.get("uri", ""),
             "image_width": image.get("width"),
