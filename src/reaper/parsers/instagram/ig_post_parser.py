@@ -345,6 +345,11 @@ class IgPostParser(BaseParser):
         media_type_raw = data.get("media_type", 0)
         user = data.get("user")
         user_pk = (user or {}).get("pk") if user else None
+        
+        final_user = self._build_user_dict(user) if user else None
+        parent_user = self._safe_get(self.result, 'user')
+        if user_pk == self._safe_get(parent_user, 'id', default=''):
+            final_user = parent_user
 
         entry: dict[str, Any] = {
             "post_user_id": f"{user_pk}_{media_pk}" if user_pk else str(media_pk),
@@ -357,12 +362,11 @@ class IgPostParser(BaseParser):
             "media_type": self._map_media_type(media_type_raw),
             "text": self._safe_get(data, "caption", "text"),
             "caption": data.get("accessibility_caption"),
-            "display_uri": data.get("display_uri"),
+            "thumbnail": data.get("display_uri"),
             "like_count": data.get("like_count", 0),
             "comment_count": data.get("comment_count", 0),
-            "image_versions": self._safe_get(data, "image_versions2", "candidates"),
-            "video_versions": data.get("video_versions"),
-            "user": self._build_user_dict(user) if user else None,
+            "image_versions": [{"url":data.get("display_uri")}],
+            "user": final_user,
         }
 
         if media_type_raw == 8:
