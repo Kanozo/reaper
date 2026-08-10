@@ -170,11 +170,13 @@ def requires_auth(html_content: str, final_url: str = "") -> AuthResult:
         final_url:    URL final tras redirecciones HTTP.
 
     Returns:
-        :class:`AuthResult` con:
-        - ``requires_auth=False`` + ``auth_type="content_unavailable"`` si el
-          contenido fue eliminado o restringido permanentemente (FB e IG).
-        - ``requires_auth=False`` sin ``auth_type`` si la página tiene contenido real.
-        - ``requires_auth=True`` con ``auth_type`` correspondiente si hay muro de auth.
+        :class:`AuthResult`:
+            - ``requires_auth=False`` + ``auth_type="content_unavailable"`` si
+              el contenido fue eliminado o restringido permanentemente (FB e IG).
+            - ``requires_auth=False`` sin ``auth_type`` si la página tiene
+              contenido real.
+            - ``requires_auth=True`` con ``auth_type`` correspondiente si hay
+              muro de auth.
     """
     # ── Capa 0: Página vacía ──────────────────────────────────────────────────
     if not html_content:

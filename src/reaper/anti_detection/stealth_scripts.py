@@ -161,11 +161,6 @@ def _patch_plugins_firefox() -> str:
 
 
 def _patch_plugins_chromium() -> str:
-    """
-    Simula plugins de Chrome (PDF Plugin, Native Client).
-
-    Chrome sin plugins = Chromium headless, señal obvia de bot.
-    """
     return """
 (function patchChromiumPlugins() {
     const makePlugin = (name, filename, desc, mimeType, suffix) => ({
@@ -175,9 +170,11 @@ def _patch_plugins_chromium() -> str:
     });
 
     const fakePlugins = [
-        makePlugin('Chrome PDF Plugin', 'internal-pdf-viewer', 'Portable Document Format', 'application/x-google-chrome-pdf', 'pdf'),
+        makePlugin('PDF Viewer', 'internal-pdf-viewer', 'Portable Document Format', 'application/pdf', 'pdf'),
         makePlugin('Chrome PDF Viewer', 'mhjfbmdgcfjbbpaeojofohoefgiehjai', '', 'application/pdf', 'pdf'),
-        makePlugin('Native Client', 'internal-nacl-plugin', '', 'application/x-nacl', ''),
+        makePlugin('Chromium PDF Viewer', 'mhjfbmdgcfjbbpaeojofohoefgiehjai', '', 'application/pdf', 'pdf'),
+        makePlugin('Microsoft Edge PDF Viewer', 'mhjfbmdgcfjbbpaeojofohoefgiehjai', '', 'application/pdf', 'pdf'),
+        makePlugin('WebKit built-in PDF', 'mhjfbmdgcfjbbpaeojofohoefgiehjai', '', 'application/pdf', 'pdf'),
     ];
 
     try {
@@ -194,18 +191,48 @@ def _patch_plugins_chromium() -> str:
         });
     } catch (_) {}
 
-    // window.chrome es obligatorio en Chrome real
+    // window.chrome más realista — Chrome 124+
     try {
         if (!window.chrome) {
             window.chrome = {
                 runtime: {
-                    id: undefined,
-                    connect: () => ({}),
-                    sendMessage: () => {},
+                    OnInstalledReason: {},
+                    OnRestartRequiredReason: {},
+                    PlatformInfo: {},
+                    RequestUpdateCheckStatus: {},
+                    connect: function() { return { onDisconnect: { addListener: function() {} }, onMessage: { addListener: function() {} }, postMessage: function() {} }; },
+                    sendMessage: function() { return Promise.resolve(); },
                 },
-                loadTimes: function() { return {}; },
-                csi: function() { return { startE: Date.now(), onloadT: Date.now(), pageT: 0, tran: 15 }; },
-                app: { isInstalled: false },
+                loadTimes: function() {
+                    return {
+                        commitLoadTime: Date.now() / 1000 - 0.5,
+                        connectionInfo: 'h2',
+                        finishDocumentLoadTime: Date.now() / 1000 - 0.2,
+                        finishLoadTime: Date.now() / 1000 - 0.1,
+                        firstPaintAfterLoadTime: 0,
+                        firstPaintTime: Date.now() / 1000 - 0.3,
+                        navigationType: 'Other',
+                        npnNegotiatedProtocol: 'h2',
+                        requestTime: Date.now() / 1000 - 0.8,
+                        startLoadTime: Date.now() / 1000 - 0.9,
+                        wasAlternateProtocolAvailable: false,
+                        wasFetchedViaSpdy: true,
+                        wasNpnNegotiated: true,
+                    };
+                },
+                csi: function() {
+                    return {
+                        startE: Date.now() - 1000,
+                        onloadT: Date.now(),
+                        pageT: 1000 + Math.random() * 500,
+                        tran: 15 + Math.floor(Math.random() * 5),
+                    };
+                },
+                app: {
+                    isInstalled: false,
+                    InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
+                    RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' },
+                },
             };
         }
     } catch (_) {}
@@ -420,27 +447,91 @@ def _patch_screen_metrics(width: int, height: int) -> str:
 
 
 def _patch_permissions_api() -> str:
-    """
-    Corrige el comportamiento del Permission API en modo headless.
-
-    En Chromium headless, ``navigator.permissions.query({name:'notifications'})``
-    devuelve ``'denied'``. En un navegador real suele ser ``'default'``.
-    """
     return """
 (function patchPermissionsAPI() {
     if (!navigator.permissions || !navigator.permissions.query) return;
 
     const origQuery = navigator.permissions.query.bind(navigator.permissions);
     navigator.permissions.query = function(permDesc) {
-        // notifications: 'denied' en headless delata bots.
-        if (permDesc && permDesc.name === 'notifications') {
-            return Promise.resolve({ state: 'default', onchange: null });
+        if (!permDesc || !permDesc.name) return origQuery(permDesc);
+        
+        // En headless real, estos devuelven 'denied' o 'prompt' inconsistente
+        const headlessDefaults = {
+            'notifications': 'default',
+            'camera':        'prompt',
+            'microphone':    'prompt',
+            'geolocation':   'prompt',
+        };
+        
+        if (permDesc.name in headlessDefaults) {
+            return Promise.resolve({
+                state: headlessDefaults[permDesc.name],
+                onchange: null,
+            });
         }
         return origQuery(permDesc);
     };
 })();
 """
 
+def _patch_media_devices() -> str:
+    """
+    Garantiza que ``navigator.mediaDevices`` existe en Chromium headless.
+
+    Chromium headless a veces omite completamente ``navigator.mediaDevices``
+    o lo expone con métodos no funcionales. Los fingerprinters avanzados
+    (CreepJS, FingerprintJS Pro) usan su ausencia como señal de automatización.
+
+    El parche crea un objeto ``MediaDevices`` con los métodos estándar:
+      - ``enumerateDevices()``     → Promise que resuelve a lista vacía
+                                     (sin micrófono/cámara en headless).
+      - ``getSupportedConstraints()`` → Objeto vacío (ninguna constraint soportada).
+      - ``getUserMedia()``         → Promise rechazada (no hay dispositivos reales).
+      - ``addEventListener()`` / ``removeEventListener()`` → no-ops.
+
+    Nota: Firefox ya expone ``navigator.mediaDevices`` correctamente en headless,
+    por lo que este parche es principalmente para Chromium. Se aplica siempre
+    porque ``if (!navigator.mediaDevices)`` lo hace no-op en Firefox.
+    """
+    return """
+(function patchMediaDevices() {
+    if (navigator.mediaDevices) return;
+
+    try {
+        const fakeMediaDevices = {
+            enumerateDevices: function() {
+                return Promise.resolve([]);
+            },
+            getSupportedConstraints: function() {
+                return {
+                    width: true, height: true, aspectRatio: true,
+                    frameRate: true, facingMode: true,
+                    echoCancellation: true, noiseSuppression: true,
+                    autoGainControl: true, sampleRate: true,
+                    sampleSize: true, channelCount: true,
+                };
+            },
+            getUserMedia: function(constraints) {
+                return Promise.reject(
+                    new DOMException(
+                        'Requested device not found',
+                        'NotFoundError'
+                    )
+                );
+            },
+            addEventListener: function() {},
+            removeEventListener: function() {},
+            dispatchEvent: function() { return true; },
+            ondevicechange: null,
+        };
+
+        Object.defineProperty(navigator, 'mediaDevices', {
+            get: () => fakeMediaDevices,
+            configurable: true,
+        });
+    } catch (_) {}
+})();
+"""
 
 def _patch_performance_timing() -> str:
     """
@@ -507,7 +598,6 @@ def _patch_notification_permission() -> str:
 })();
 """
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Compositor público
 # ─────────────────────────────────────────────────────────────────────────────
@@ -562,5 +652,6 @@ def build_full_stealth_script(
         _patch_performance_timing(),
         _patch_notification_permission(),
         _patch_iframe_propagation(),
+        _patch_media_devices(),
     ]
     return "\n".join(parts)

@@ -8,6 +8,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from camoufox.sync_api import Camoufox
+from camoufox.async_api import AsyncCamoufox
+
 from playwright.async_api import (
     Browser,
     BrowserContext,
@@ -17,7 +20,6 @@ from playwright.async_api import (
 
 from reaper.anti_detection import (
     BrowserFingerprint,
-    generate_fingerprint,
     human_delay,
     human_scroll,
     micro_delay,
@@ -110,7 +112,7 @@ class BrowserConfig:
 
     # Tipo de navegador para el fingerprint. "firefox" = mejor cobertura en Meta
     # (Facebook/Instagram). "chromium" para otros targets.
-    ANTI_DETECTION_BROWSER_TYPE: str = "firefox"
+    ANTI_DETECTION_BROWSER_TYPE: str = "chromium"
 
     # ---- Proxy ----
     PROXY_SERVER: str | None = None    # "http://proxy.example.com:8080" | "socks5://..."
@@ -320,7 +322,7 @@ class ContentFetcher:
 
     Uso básico::
 
-        fetcher = ContentFetcher("https://www.facebook.com/reel/XXXXXX")
+        fetcher = ContentFetcher("https://www.facebook.com/reel/816043001524221")
         result = await fetcher.fetch(auto_scroll=True)
         if result.success:
             html = result.html_content
@@ -374,36 +376,24 @@ class ContentFetcher:
         cookies: list[dict] | None = None,
     ) -> FetchResult:
         """
-        Ejecuta la navegación completa y retorna HTML + tráfico de red.
+        Ejecuta la navegación completa usando Camoufox.
 
-        Flujo interno:
-            1. Crear ``NetworkInterceptor`` y ``FetchResult`` base.
-            2. Lanzar Firefox con configuración anti-detección.
-            3. Crear contexto (viewport, user-agent, locale, proxy opcional).
-            4. **Adjuntar el interceptor ANTES de navegar** (captura desde inicio).
-            5. Navegar a la URL y esperar ``networkidle``.
-            6. (Opcional) Capturar screenshot del contenedor principal.
-            7. (Opcional) Ejecutar scroll (auto o infinity).
-            8. Capturar el HTML final (``page.content()``).
-            9. (Debug) Guardar artefactos en disco.
-            10. Cerrar navegador y retornar FetchResult.
+        Camoufox es un Firefox modificado que:
+        - Evade detección de Facebook (no muestra logo congelado)
+        - Captura tráfico sin errores 0x80004005
+        - No requiere stealth JS adicional
 
         Args:
-            screenshot:      Captura PNG del contenedor ``div[role='dialog']``.
+            screenshot:      Captura PNG del contenedor.
             auto_scroll:     Scroll midiendo cambios de altura DOM.
             infinity_scroll: Scroll monitorizando tráfico de red.
-                             Tiene prioridad sobre ``auto_scroll`` si ambos True.
             proxy_server:    URL del proxy (ej: "http://ip:port").
             proxy_username:  Usuario para autenticación del proxy.
             proxy_password:  Contraseña para autenticación del proxy.
-            cookies:         Lista de cookies en formato Playwright a inyectar
-                             en el contexto del navegador antes de navegar.
-                             Permite sesiones autenticadas sin login interactivo.
-                             ``None`` = navegación anónima.
+            cookies:         Lista de cookies en formato Playwright.
 
         Returns:
             FetchResult con HTML renderizado, tráfico capturado y metadatos.
-            Si falla, ``success=False`` y ``error`` describe el problema.
         """
         interceptor = NetworkInterceptor(
             debug=self.debug,
@@ -412,6 +402,7 @@ class ContentFetcher:
 
         result = FetchResult(original_url=self.url)
 
+        # Configurar proxy para Camoufox
         proxy_config: dict[str, str] | None = None
         if proxy_server:
             proxy_config = {"server": proxy_server}
@@ -419,68 +410,38 @@ class ContentFetcher:
                 proxy_config["username"] = proxy_username
             if proxy_password:
                 proxy_config["password"] = proxy_password
-            if self.debug:
-                logger.debug("Configurando proxy: %s", proxy_server)
 
         try:
-            async with async_playwright() as pw:
-                browser = await self._launch_browser(pw)
-
-                # ── Fingerprint anti-detección ────────────────────────────────
-                # Se genera ANTES del contexto para que build_context_options()
-                # configure UA, viewport, locale, timezone y headers de forma
-                # internamente coherente (el mismo perfil de hardware/OS).
-                fingerprint: BrowserFingerprint | None = None
-                if self.cfg.USE_ANTI_DETECTION:
-                    fingerprint = generate_fingerprint(
-                        self.cfg.ANTI_DETECTION_BROWSER_TYPE
-                    )
-                    self._fingerprint = fingerprint
-                    logger.debug(
-                        "Fingerprint generado | os=%s | ua=%.70s",
-                        fingerprint.navigator_platform,
-                        fingerprint.user_agent,
-                    )
-
-                context = await self._create_context(
-                    browser,
-                    proxy_config=proxy_config,
-                    fingerprint=fingerprint,
+            # ── Lanzar Camoufox ──
+            # Camoufox tiene su propio async context manager
+            async with AsyncCamoufox(
+                headless=self.headless,
+                proxy=proxy_config,
+                # Anti-detección nativa (no necesita stealth JS)
+                humanize=True,  # Simula comportamiento humano
+                os=random.choice(["windows", "macos", "linux"]),  # OS aleatorio
+            ) as browser:
+                context = await browser.new_context(
+                    viewport=self.cfg.VIEWPORT,
+                    locale=self.cfg.LOCALE,
+                    timezone_id=self.cfg.TIMEZONE_ID,
                 )
                 page = await context.new_page()
 
-                # ── Inyección de stealth JS ───────────────────────────────────
-                # DEBE ejecutarse ANTES de page.goto() para que los parches
-                # (navigator.webdriver, WebGL, canvas noise, etc.) estén activos
-                # desde el primer frame de la página, antes de cualquier script
-                # de detección que pueda cargar el servidor.
-                if fingerprint:
-                    await page.add_init_script(fingerprint.stealth_js)
-                    logger.debug("Stealth JS inyectado (%d bytes)", len(fingerprint.stealth_js))
-
-                # ── Inyección de cookies de sesión ────────────────────────────
-                # Las cookies se añaden al contexto ANTES de navegar para que
-                # estén disponibles desde la primera petición y evitar
-                # redirects al muro de login de Facebook/Instagram.
-                # El contexto (no la página) es el scope correcto en Playwright:
-                # aplica a todas las páginas del contexto y persiste entre
-                # navegaciones dentro de la sesión.
+                # ── Inyección de cookies ──
                 if cookies:
                     await context.add_cookies(cookies)
                     if self.debug:
                         logger.debug(
-                            "Cookies de sesión inyectadas | cantidad=%d | "
-                            "dominios=%s",
+                            "Cookies inyectadas | cantidad=%d | dominios=%s",
                             len(cookies),
                             list({c.get("domain", "?") for c in cookies})[:5],
                         )
 
-                # ADJUNTAR ANTES DE NAVEGAR: garantiza que no se pierden
-                # las peticiones de la carga inicial de la página.
+                # ── Adjuntar interceptor ANTES de navegar ──
                 await interceptor.attach(page)
 
                 if not await self._navigate(page):
-                    await browser.close()
                     result.error = "Falló la navegación a la URL."
                     result.traffic = interceptor.get_traffic()
                     return result
@@ -496,25 +457,12 @@ class ContentFetcher:
                 self._html_content = await page.content()
                 self._final_url = page.url
 
-                # ── Captura de cookies actualizadas post-navegación ───────────
-                # Cuando la sesión es autenticada, el servidor emite cabeceras
-                # Set-Cookie en cada respuesta que renuevan tokens de corta vida
-                # y extienden el TTL de las cookies de sesión. Playwright acumula
-                # estos cambios en el contexto automáticamente durante la sesión.
-                # BaseScraper._fetch_with_account() comparará este valor con las
-                # cookies originales y persistirá las actualizadas si difieren,
-                # alargando la vida de la sesión sin necesidad de login manual.
-                # Solo se leen cuando la sesión era autenticada (cookies != None)
-                # para no incurrir en el coste de context.cookies() en modo anónimo.
+                # ── Capturar cookies actualizadas ──
                 if cookies is not None:
                     try:
-                        self._updated_cookies: list[dict] | None = await context.cookies()
+                        self._updated_cookies = await context.cookies()
                     except Exception as _exc:
-                        # No es un error crítico: la petición fue exitosa.
-                        # El auto-refresh simplemente no ocurrirá en esta iteración.
-                        logger.debug(
-                            "No se pudieron leer las cookies post-navegación: %s", _exc
-                        )
+                        logger.debug("No se pudieron leer cookies post-nav: %s", _exc)
                         self._updated_cookies = None
                 else:
                     self._updated_cookies = None
@@ -523,8 +471,6 @@ class ContentFetcher:
                     session_dir = await self._save_debug_artifacts(page, interceptor, result)
                     result.debug_session_dir = session_dir
                     interceptor.print_summary()
-
-                await browser.close()
 
             result.html_content = self._html_content
             result.final_url = self._final_url
@@ -536,7 +482,7 @@ class ContentFetcher:
         except Exception as exc:
             result.error = str(exc)
             result.traffic = interceptor.get_traffic()
-            logger.error("Error al obtener el contenido: %s", exc)
+            logger.error("Error al obtener contenido: %s", exc)
             if self.debug:
                 traceback.print_exc()
 
@@ -548,34 +494,21 @@ class ContentFetcher:
 
     async def _launch_browser(self, pw) -> Browser:
         """
-        Lanza Firefox con configuración reducida de huellas de automatización.
+        Lanza Camoufox (Firefox modificado anti-detección).
 
-        Los flags de Chromium (--disable-blink-features, --no-sandbox, etc.) no
-        aplican a Firefox y se omiten. La evasión en Firefox se logra principalmente
-        vía stealth JS (add_init_script) y el fingerprint coherente del contexto.
+        Camoufox resuelve:
+        1. Detección de automatización por Facebook (patches binarios)
+        2. Error 0x80004005 al leer bodies (patches de red)
 
-        Args:
-            pw: Instancia activa de async_playwright.
+        Nota: Camoufox tiene su propio launcher, no usa pw.firefox.launch().
+        El parámetro 'pw' se ignora pero se mantiene por compatibilidad de interfaz.
 
         Returns:
-            Browser: Instancia del navegador lanzado.
+            Browser: Instancia de Camoufox (compatible con API de Playwright).
         """
-        return await pw.firefox.launch(
-            headless=self.headless,
-            firefox_user_prefs={
-                # Desactivar telemetría y reportes de crash que pueden revelar
-                # que el navegador no es usado interactivamente.
-                "toolkit.telemetry.enabled": False,
-                "toolkit.telemetry.unified": False,
-                "datareporting.healthreport.uploadEnabled": False,
-                "datareporting.policy.dataSubmissionEnabled": False,
-                # Deshabilitar Pocket y servicios de sincronización externos.
-                "extensions.pocket.enabled": False,
-                "identity.fxaccounts.enabled": False,
-                # Reducir fingerprint de fuentes del sistema.
-                "browser.display.use_document_fonts": 1,
-            },
-        )
+        # Camoufox se lanza con su propio contexto, no con async_playwright
+        # Retornamos None aquí y manejamos el lanzamiento en fetch()
+        return None
 
     async def _create_context(
         self,
@@ -584,38 +517,10 @@ class ContentFetcher:
         fingerprint: BrowserFingerprint | None = None,
     ) -> BrowserContext:
         """
-        Crea un contexto de navegador con fingerprint coherente o con config estática.
-
-        Cuando ``fingerprint`` está presente (``USE_ANTI_DETECTION=True``), delega
-        en ``BrowserFingerprint.build_context_options()`` que genera un perfil
-        internamente consistente: UA, viewport, locale, timezone y headers HTTP
-        corresponden al mismo sistema operativo y hardware simulado.
-
-        Cuando ``fingerprint`` es None (``USE_ANTI_DETECTION=False``), usa los
-        valores estáticos de ``BrowserConfig`` como fallback.
-
-        Args:
-            browser:      Instancia del navegador ya lanzado.
-            proxy_config: dict con ``server``, ``username``, ``password`` (opcionales).
-            fingerprint:  BrowserFingerprint generado por ``generate_fingerprint()``.
-                          Si None, usa config estática.
-
-        Returns:
-            BrowserContext configurado y listo para abrir páginas.
+        Camoufox maneja su propio contexto con anti-detección nativa.
+        Este método no se usa con Camoufox, pero se mantiene por compatibilidad.
         """
-        if fingerprint:
-            context_args = fingerprint.build_context_options(proxy=proxy_config)
-        else:
-            context_args = {
-                "viewport": self.cfg.VIEWPORT,
-                "user_agent": self.cfg.USER_AGENT,
-                "locale": self.cfg.LOCALE,
-                "timezone_id": self.cfg.TIMEZONE_ID,
-            }
-            if proxy_config:
-                context_args["proxy"] = proxy_config
-
-        return await browser.new_context(**context_args)
+        raise NotImplementedError("Camoufox maneja su propio contexto")
 
     # ------------------------------------------------------------------
     # Navegación
@@ -623,13 +528,11 @@ class ContentFetcher:
 
     async def _navigate(self, page: Page) -> bool:
         """
-        Navega a ``self.url`` y espera a que la red esté inactiva.
+        Navega a ``self.url`` y espera a que el DOM esté listo.
 
-        Usa ``wait_until="networkidle"`` para asegurar que el contenido
-        dinámico (JS, API calls) haya terminado de cargarse. Con anti-detección
-        activa sustituye el ``asyncio.sleep`` fijo por ``simulate_idle`` (ratón
-        en movimiento natural) y ocasionalmente simula un cambio de pestaña
-        para activar eventos ``visibilitychange`` que páginas reales disparan.
+        CRÍTICO: No usar ``wait_until="networkidle"`` con Facebook porque
+        tiene heartbeats periódicos (/nw/, webstorage) que mantienen la red
+        "activa" indefinidamente, causando que el proceso nunca termine.
 
         Args:
             page: Página de Playwright activa.
@@ -639,17 +542,17 @@ class ContentFetcher:
         """
         try:
             logger.info("Navegando a: %s", self.url)
+            
+            # ── CRÍTICO: Usar domcontentloaded en lugar de networkidle ──
             await page.goto(
                 self.url,
-                wait_until="networkidle",
+                wait_until="domcontentloaded",  # ← Cambiar de "networkidle"
                 timeout=self.cfg.NAVIGATION_TIMEOUT_MS,
             )
             logger.info("URL final: %s", page.url)
 
+            # Espera adicional para que el JS renderice el contenido
             if self.cfg.USE_ANTI_DETECTION:
-                # simulate_idle aporta movimiento de ratón realista durante la espera;
-                # el rango aleatorio evita el patrón de duración fija que detectan
-                # los sistemas basados en timing.
                 idle_duration = random.uniform(
                     self.cfg.PAGE_LOAD_WAIT * 0.5,
                     self.cfg.PAGE_LOAD_WAIT,
@@ -657,8 +560,6 @@ class ContentFetcher:
                 logger.debug("Post-nav idle: %.2fs", idle_duration)
                 await simulate_idle(page, idle_duration)
 
-                # 35% de probabilidad de simular un cambio de pestaña breve.
-                # Activa los eventos visibilitychange que esperan algunos trackers.
                 if random.random() < 0.35:
                     await simulate_page_focus_blur(page)
             else:
@@ -700,29 +601,10 @@ class ContentFetcher:
 
     async def _auto_scroll(self, page: Page) -> None:
         """
-        Scroll automático midiendo cambios de ``scrollHeight`` del contenedor.
+        Scroll automático con detección y cierre garantizado de auth dialogs.
 
-        Determina el **target de scroll** siguiendo esta lógica:
-
-        1. Si no existe ``div[role='dialog']`` → scroll sobre la **página**.
-        2. Si existe y es un **auth dialog** (login/sign-up wall):
-        → cierra el dialog → scroll sobre la **página**.
-        3. Si existe y es un **content dialog** (post, reel, comentarios…):
-        → scroll sobre el **dialog**.
-
-        Detección de auth dialog (señales independientes, OR lógico):
-            1. ``input[type="password"]`` — universal, no depende de idioma.
-            2. ``form[action*="login"]``  — específico de Meta/FB.
-            3. ``input[name="email"]`` o ``input[name="pass"]``.
-
-        Botón de cierre del auth dialog: ``[role='button']`` con ``aria-label``
-        que coincida con cualquiera de las traducciones conocidas de "cerrar".
-        Fallback: primer ``[role='button']`` visible cuyo label no sea acción
-        de contenido (Like, Comment, Share…).
-
-        Con anti-detección activa sustituye ``mouse.wheel`` + ``asyncio.sleep``
-        fijo por ``human_scroll()`` y añade comportamiento idle y distracciones
-        ocasionales entre iteraciones.
+        Si detecta un login popup, lo cierra inmediatamente y hace scroll
+        sobre la página completa. Timeout global de 60 segundos.
 
         Args:
             page: Página de Playwright activa (con interceptor ya adjunto).
@@ -737,122 +619,119 @@ class ContentFetcher:
             "close", "cerrar", "fermer", "schließen", "chiudi",
             "fechar", "закрыть", "닫기", "关闭", "閉じる",
         })
-        _ACTION_ARIA_LABELS: frozenset[str] = frozenset({
-            "like", "comment", "share", "log in", "create new account",
-            "me gusta", "comentar", "compartir",
-        })
 
         try:
-            # ── Determinar target de scroll ──────────────────────────────────
+            # ── Detectar dialog con timeout de 10s ──
             container = page.locator('div[role="dialog"]')
-            bbox = await container.bounding_box()
+            
+            try:
+                await container.wait_for(state="visible", timeout=10000)
+                bbox = await container.bounding_box()
+                logger.debug("Dialog detectado y visible")
+            except Exception:
+                bbox = None
+                logger.debug("No hay dialog visible tras 10s. Scroll sobre la página.")
 
-            # scroll_on_page=True  → wheel sobre viewport + scrollHeight del document
-            # scroll_on_page=False → wheel sobre el dialog   + scrollHeight del dialog
-            scroll_on_page: bool = bbox is None  # default: no hay dialog → página
+            scroll_on_page: bool = bbox is None
 
             if bbox is not None:
-                # Hay dialog — determinar si es auth
+                # ── Detectar si es auth dialog ──
                 is_auth_dialog = False
                 for selector in _AUTH_SELECTORS:
                     try:
                         if await container.locator(selector).count() > 0:
                             is_auth_dialog = True
-                            logger.debug(
-                                "Auth dialog detectado via selector '%s'.", selector
-                            )
+                            logger.debug("Auth dialog detectado via selector '%s'.", selector)
                             break
                     except Exception:
                         continue
 
                 if is_auth_dialog:
-                    # ── Cerrar el auth dialog ────────────────────────────────
+                    # ── Cerrar auth dialog ──
                     close_btn = None
 
-                    # Intento 1: aria-label de cierre conocido
+                    # Intento 1: aria-label="Close"
                     for btn in await container.locator("[role='button'][aria-label]").all():
                         try:
-                            label = (
-                                await btn.get_attribute("aria-label") or ""
-                            ).lower().strip()
+                            label = (await btn.get_attribute("aria-label") or "").lower().strip()
                             if label in _CLOSE_ARIA_LABELS:
                                 close_btn = btn
-                                logger.debug(
-                                    "Botón close encontrado: aria-label=%r", label
-                                )
+                                logger.debug("Botón close encontrado: aria-label=%r", label)
                                 break
                         except Exception:
                             continue
 
-                    # Intento 2 (fallback): primer botón visible no-acción
+                    # Intento 2: primer botón visible sin aria-label de acción
                     if close_btn is None:
                         for btn in await container.locator("[role='button']").all():
                             try:
                                 if not await btn.is_visible():
                                     continue
-                                label = (
-                                    await btn.get_attribute("aria-label") or ""
-                                ).lower().strip()
-                                if label and label not in _ACTION_ARIA_LABELS:
+                                label = (await btn.get_attribute("aria-label") or "").lower().strip()
+                                # Si no tiene label o no es una acción de contenido, es el close
+                                if not label or label not in {"like", "comment", "share", "log in", "create new account"}:
                                     close_btn = btn
-                                    logger.debug(
-                                        "Botón close (fallback): aria-label=%r", label
-                                    )
+                                    logger.debug("Botón close (fallback) encontrado")
                                     break
                             except Exception:
                                 continue
 
+                    # Intento 3: tecla Escape (método universal)
                     if close_btn is not None:
-                        if self.cfg.USE_ANTI_DETECTION:
-                            btn_bbox = await close_btn.bounding_box()
-                            if btn_bbox:
-                                cx = btn_bbox["x"] + btn_bbox["width"] / 2
-                                cy = btn_bbox["y"] + btn_bbox["height"] / 2
-                                await page.mouse.move(cx, cy)
-                                await micro_delay(80, 150)
-                        await close_btn.click()
-                        logger.debug(
-                            "Auth dialog cerrado. Continuando scroll sobre la página."
-                        )
+                        try:
+                            if self.cfg.USE_ANTI_DETECTION:
+                                btn_bbox = await close_btn.bounding_box()
+                                if btn_bbox:
+                                    cx = btn_bbox["x"] + btn_bbox["width"] / 2
+                                    cy = btn_bbox["y"] + btn_bbox["height"] / 2
+                                    await page.mouse.move(cx, cy)
+                                    await micro_delay(80, 150)
+                            await close_btn.click()
+                            logger.debug("Auth dialog cerrado via click")
+                        except Exception as exc:
+                            logger.warning("Click en close falló: %s. Usando Escape.", exc)
+                            await page.keyboard.press("Escape")
+                            logger.debug("Auth dialog cerrado via Escape")
                     else:
-                        logger.warning(
-                            "Auth dialog detectado pero no se encontró botón de cierre; "
-                            "scroll sobre la página de todos modos."
-                        )
+                        logger.warning("No se encontró botón close. Usando Escape.")
+                        await page.keyboard.press("Escape")
+                        logger.debug("Auth dialog cerrado via Escape")
 
-                    # En ambos casos (cerrado o no) el scroll va sobre la página
+                    # Esperar a que el dialog desaparezca
+                    await asyncio.sleep(1.0)
                     scroll_on_page = True
 
-                # else: content dialog → scroll_on_page permanece False
-
-            # ── Posicionar cursor y configurar evaluador de altura ───────────
+            # ── Posicionar cursor ──
             if scroll_on_page:
-                # Mover cursor al centro del viewport para que wheel actúe sobre él
                 viewport = page.viewport_size or {"width": 1280, "height": 720}
                 center_x = viewport["width"] / 2
                 start_y = viewport["height"] / 2
                 await page.mouse.move(center_x, start_y)
                 get_scroll_height = "document.documentElement.scrollHeight"
-                logger.debug(
-                    "Scroll sobre PÁGINA | cursor X=%.0f, Y=%.0f", center_x, start_y
-                )
+                logger.debug("Scroll sobre PÁGINA | cursor X=%.0f, Y=%.0f", center_x, start_y)
             else:
                 center_x = bbox["x"] + bbox["width"] / 2
                 start_y = bbox["y"] + 100
                 await page.mouse.move(center_x, start_y)
                 get_scroll_height = "el => el.scrollHeight"
-                logger.debug(
-                    "Scroll sobre DIALOG | cursor X=%.0f, Y=%.0f", center_x, start_y
-                )
+                logger.debug("Scroll sobre DIALOG | cursor X=%.0f, Y=%.0f", center_x, start_y)
 
-            # ── Bucle de scroll ──────────────────────────────────────────────
+            # ── Bucle de scroll con timeout global ──
             last_height = 0
             no_change_count = 0
             iteration = 0
+            start_time = asyncio.get_event_loop().time()
+            MAX_SCROLL_TIME = 60  # Timeout global
 
-            logger.debug("Iniciando auto-scroll (modo altura DOM)...")
+            logger.debug("Iniciando auto-scroll (timeout: %ds)...", MAX_SCROLL_TIME)
 
             while iteration < self.cfg.MAX_SCROLL_ITERATIONS:
+                # Verificar timeout global
+                elapsed = asyncio.get_event_loop().time() - start_time
+                if elapsed > MAX_SCROLL_TIME:
+                    logger.debug("Auto-scroll finalizado: timeout %ds alcanzado", MAX_SCROLL_TIME)
+                    break
+
                 if self.cfg.USE_ANTI_DETECTION:
                     await human_scroll(page, direction="down", amount=self.cfg.SCROLL_DELTA)
                     await micro_delay(150, int(self.cfg.SCROLL_WAIT_TIME * 1000))
@@ -860,7 +739,7 @@ class ContentFetcher:
                     await page.mouse.wheel(0, self.cfg.SCROLL_DELTA)
                     await asyncio.sleep(self.cfg.SCROLL_WAIT_TIME)
 
-                # Medir altura según el target activo
+                # Medir altura
                 if scroll_on_page:
                     current_height = await page.evaluate(get_scroll_height)
                 else:
@@ -868,11 +747,7 @@ class ContentFetcher:
 
                 if current_height == last_height:
                     no_change_count += 1
-                    logger.debug(
-                        "Sin cambio (%d/%d)",
-                        no_change_count,
-                        self.cfg.NO_CHANGE_THRESHOLD,
-                    )
+                    logger.debug("Sin cambio (%d/%d)", no_change_count, self.cfg.NO_CHANGE_THRESHOLD)
                     if no_change_count >= self.cfg.NO_CHANGE_THRESHOLD:
                         logger.debug("Auto-scroll finalizado: sin más contenido.")
                         break
@@ -880,16 +755,7 @@ class ContentFetcher:
                     no_change_count = 0
                     height_delta = current_height - last_height
                     last_height = current_height
-                    logger.debug(
-                        "scrollHeight: %dpx (+%dpx)", current_height, height_delta
-                    )
-                    if self.cfg.USE_ANTI_DETECTION:
-                        words_visible = max(20, height_delta // 15)
-                        await simulate_reading_pause(page, words_visible)
-
-                if self.cfg.USE_ANTI_DETECTION and random.random() < 0.15:
-                    await simulate_distraction(page)
-                    await page.mouse.move(center_x, start_y)
+                    logger.debug("scrollHeight: %dpx (+%dpx)", current_height, height_delta)
 
                 iteration += 1
 
@@ -1328,17 +1194,10 @@ def load_debug_session(session_dir: str | Path) -> FetchResult:
     Funciona con sesiones guardadas por ``ContentFetcher`` cuando ``debug=True``.
     No requiere abrir un navegador ni hacer peticiones de red::
 
-        from get_content import load_debug_session
-        from parsers import FbPostParser
+        from reaper.network import load_debug_session
 
         result = load_debug_session("data/debug_artifacts/www.facebook.com_reel_20250601_143022")
-        parser = FbPostParser(
-            html_content=result.html_content,
-            final_url=result.final_url,
-            original_url=result.original_url,
-            traffic=result.traffic,
-        )
-        data = parser.parse()
+        print(result.final_url, result.fetched_at)
 
     Args:
         session_dir: Ruta al directorio de la sesión de debug.

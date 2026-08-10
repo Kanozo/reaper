@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con soporte de cuentas autenticadas">
+        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con cuentas autenticadas, almacenamiento configurable (local/PostgreSQL/MongoDB) y anti-detección integrada">
       
       
         <meta name="author" content="Reaper Contributors">
@@ -500,6 +500,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Almacenamiento (local/PG/Mongo)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user/login/" class="md-nav__link">
         
   
@@ -846,6 +874,56 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#deteccion-de-bloqueo-de-acceso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detección de bloqueo de acceso
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Detección de bloqueo de acceso">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#capas-de-deteccion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capas de detección
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flujo-completo-en-facebookscraperrun" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flujo completo en FacebookScraper.run()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#valores-de-status-en-el-resultado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Valores de status en el resultado
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -954,6 +1032,34 @@
     
   
     Extender Reaper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../anti_scraping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Anti-Detección (anti_detection)
   
 
     
@@ -1339,6 +1445,56 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#deteccion-de-bloqueo-de-acceso" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detección de bloqueo de acceso
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Detección de bloqueo de acceso">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#capas-de-deteccion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Capas de detección
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#flujo-completo-en-facebookscraperrun" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flujo completo en FacebookScraper.run()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#valores-de-status-en-el-resultado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Valores de status en el resultado
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1440,6 +1596,88 @@ de Playwright <strong>antes de navegar</strong>:</p>
 <p>La inyección en el contexto (en lugar de en la página) garantiza que las
 cookies estén presentes desde la primera petición de red y evita cualquier
 redirect al muro de login de la plataforma.</p>
+<hr />
+<h2 id="deteccion-de-bloqueo-de-acceso">Detección de bloqueo de acceso<a class="headerlink" href="#deteccion-de-bloqueo-de-acceso" title="Permanent link">&para;</a></h2>
+<p><code>requires_auth()</code> evalúa el HTML en cuatro capas ordenadas de mayor a menor
+prioridad. El resultado determina si el scraper reintenta, retorna error o
+retorna <code>content_unavailable</code>.</p>
+<h3 id="capas-de-deteccion">Capas de detección<a class="headerlink" href="#capas-de-deteccion" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>requires_auth(html, final_url)
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    │
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    ├─ Capa 1   ¿tracePolicy de contenido real en el HTML?
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    │               → AuthResult(requires_auth=False)   [página normal con popup]
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    │
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    ├─ Capa 1b  ¿Título/cuerpo de error de contenido no disponible?
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    │               → AuthResult(requires_auth=False, auth_type=&quot;content_unavailable&quot;)
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    │               [contenido eliminado — autenticarse no resuelve]
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    │
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    ├─ Capa 2   ¿URL final redirigida a /login o /checkpoint?
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    │               → AuthResult(requires_auth=True, auth_type=&quot;login_redirect&quot;)
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    │
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    ├─ Capa 3   ¿tracePolicy=&quot;comet.error&quot; o canonicalRouteName=CometErrorRoute?
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>    │               → AuthResult(requires_auth=True, auth_type=&quot;error_route&quot;)
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>    │
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>    └─ Capa 4   ¿CometErrorRoot.react + privacy=true? (ambas necesarias)
+<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>                    → AuthResult(requires_auth=True, auth_type=&quot;privacy_wall&quot;)
+</code></pre></div>
+<h3 id="flujo-completo-en-facebookscraperrun">Flujo completo en <code>FacebookScraper.run()</code><a class="headerlink" href="#flujo-completo-en-facebookscraperrun" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>fetch_result
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    │
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    ▼
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>requires_auth(html, url)
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    │
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    ├─ auth_type == &quot;content_unavailable&quot;
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    │       └─ _content_unavailable_result()   → status=&quot;content_unavailable&quot;
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    │          [sin reintento, sin tocar el pool]
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    │
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    ├─ requires_auth == True
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    │       └─ _handle_auth_wall(reason, url)
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    │               │
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    │               ├─ _active_account_id is None?  (fetch era anónimo)
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>    │               │       ├─ account_manager is None → error
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>    │               │       └─ → _retry_with_account()
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    │               │
+<a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>    │               └─ _active_account_id is not None?  (fetch autenticado)
+<a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    │                       ├─ update_status(COOKIE_EXPIRED)
+<a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>    │                       ├─ _active_account_id = None
+<a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>    │                       └─ → _retry_with_account()
+<a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>    │
+<a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>    │                   _retry_with_account()
+<a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>    │                       ├─ fetch_with_account()
+<a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>    │                       └─ requires_auth(html_retry)?
+<a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>    │                               ├─ SÍ → None → error definitivo
+<a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>    │                               └─ NO → fetch_result → continuar parseo
+<a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>    │
+<a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a>    └─ requires_auth == False
+<a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a>            └─ continuar flujo normal (selección de parser)
+</code></pre></div>
+<h3 id="valores-de-status-en-el-resultado">Valores de <code>status</code> en el resultado<a class="headerlink" href="#valores-de-status-en-el-resultado" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th><code>status</code></th>
+<th>Causa</th>
+<th>Reintento</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"ok"</code></td>
+<td>Extracción exitosa</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>"content_unavailable"</code></td>
+<td>Contenido eliminado o inaccesible para todos</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>"error"</code></td>
+<td>Fallo técnico, muro no recuperable, o doble muro</td>
+<td>No aplica</td>
+</tr>
+</tbody>
+</table>
 
 
 

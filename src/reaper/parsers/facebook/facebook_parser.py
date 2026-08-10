@@ -1,9 +1,10 @@
-from reaper.utils.logger import get_logger
+import re
 from typing import Any
 
 from reaper.network.interceptor import CapturedTraffic
-from reaper.utils import get_text_from_url, srt_to_dict
 from reaper.parsers.base_parser import BaseParser
+from reaper.utils import get_text_from_url, srt_to_dict
+from reaper.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -82,11 +83,18 @@ class FacebookContentParser(BaseParser):
         if not actors and fallback_path:
             actors = self._safe_get(story, *fallback_path)
 
-        
+
         if actors and isinstance(actors, list) and len(actors) > 0:
             actor = actors[0]
             author_id = self._safe_get(actor, "id", default="unknown")
-            author_name = self._safe_get(actor, "name") or self._safe_get(story, 'comet_sections', 'context_layout', 'story', 'comet_sections', 'actor_photo', 'story', 'actors')[0]['name'] or "unknow"
+            author_name = (
+                self._safe_get(actor, "name")
+                or self._safe_get(
+                    story, 'comet_sections', 'context_layout', 'story',
+                    'comet_sections', 'actor_photo', 'story', 'actors',
+                )[0]['name']
+                or "unknow"
+            )
             return {
                 "id": author_id,
                 "name": author_name,
@@ -257,13 +265,17 @@ class FacebookContentParser(BaseParser):
         )
 
         if not feedback:
-            logger.debug("No se encontró feedback en el story.")
-            return {
-                "reaction_count": 0,
-                "share_count": 0,
-                "comments_count": 0,
-                "reactions": [],
-            }
+            feedback = self._safe_get(
+                        story, "feedback",
+                    )
+            if not feedback:
+                logger.debug("No se encontró feedback en el story.")
+                return {
+                    "reaction_count": 0,
+                    "share_count": 0,
+                    "comments_count": 0,
+                    "reactions": [],
+                }
 
         # Contadores principales
         reaction_count = self._safe_get(
@@ -271,17 +283,54 @@ class FacebookContentParser(BaseParser):
         )
         share_count = self._safe_get(feedback, "share_count", "count", default=0)
 
-        # Comments count (ruta más profunda que el nodo feedback principal)
+        # 1. Intentamos la ruta profunda
         comments_count = self._safe_get(
             story,
-            "comet_sections", "feedback", "story",
-            "story_ufi_container", "story",
-            "feedback_context", "feedback_target_with_context",
-            "comment_list_renderer", "feedback",
-            "comment_rendering_instance_for_feed_location",
-            "comments", "total_count",
-            default=0,
+            "comet_sections", "feedback", "story", "story_ufi_container", "story",
+            "feedback_context", "feedback_target_with_context", "comment_list_renderer",
+            "feedback", "comment_rendering_instance_for_feed_location", "comments", "total_count"
         )
+
+        # 2. Si no se encontró (es None), intentamos la ruta corta
+        if comments_count is None:
+            comments_count = self._safe_get(feedback, "total_comment_count")
+
+        # 3. Fallback para feeds de grupo: los contadores viven en
+        #    ``feedback.adaptive_ufi_action_renderers`` (renderers por
+        #    tipo de acción). Cada renderer expone su contador en
+        #    ``feedback.reaction_count / share_count / comment_rendering_instance``.
+        adaptive_renderers = (
+            feedback.get("adaptive_ufi_action_renderers") or []
+        )
+        for renderer in adaptive_renderers:
+            if not isinstance(renderer, dict):
+                continue
+            renderer_feedback = renderer.get("feedback") or {}
+            renderer_type = renderer.get("__typename") or ""
+
+            if renderer_type == "UFIStoryReactActionRenderer":
+                rc = self._safe_get(
+                    renderer_feedback, "reaction_count", "count"
+                )
+                if rc is not None:
+                    reaction_count = rc
+
+            elif renderer_type == "UFICommentActionRenderer":
+                cc = self._safe_get(
+                    renderer_feedback,
+                    "comment_rendering_instance", "comments", "total_count",
+                )
+                if cc is not None:
+                    comments_count = cc
+
+            elif renderer_type == "XFBUFIAdaptiveShareActionRenderer":
+                sc = self._safe_get(renderer_feedback, "share_count", "count")
+                if sc is not None:
+                    share_count = sc
+
+        # 4. Si sigue sin encontrarse, lo dejamos en 0
+        if comments_count is None:
+            comments_count = 0
 
         # Top reactions (desglose por tipo)
         reactions = [
@@ -336,6 +385,17 @@ class FacebookContentParser(BaseParser):
             renderer_type = self._safe_get(style, "__typename", default="")
             media_type = self._safe_get(att, "media", "__typename")
 
+            # Formato de highlight/group: el renderer y el media viven
+            # anidados en ``style_type_renderer`` en lugar de ``styles``/``media``.
+            if not style and "style_type_renderer" in att:
+                str_renderer = att.get("style_type_renderer") or {}
+                style = dict(str_renderer)
+                style["attachment"] = str_renderer.get("attachment", {})
+                renderer_type = str_renderer.get("__typename", "")
+                media = self._safe_get(str_renderer, "attachment", "media") or {}
+                att["media"] = media
+                att["styles"] = style
+
             if renderer_type == "StoryAttachmentAlbumStyleRenderer":
                 attachments.extend(self._extract_album_attachment(style))
 
@@ -374,7 +434,7 @@ class FacebookContentParser(BaseParser):
                 "type": node.get("media", {}).get("__typename", "Photo"),
                 "id": node.get("media", {}).get("id", ""),
                 "url": self._safe_get(node, "media", "image", "uri"),
-                
+
                 "caption": node.get("media", {}).get("accessibility_caption", ""),
             }
             for node in nodes
@@ -391,15 +451,10 @@ class FacebookContentParser(BaseParser):
         """
         media = self._safe_get(style, "attachment", "media") or {}
 
-        captions_locales = media.get("video_available_captions_locales")
-        captions = []
-        for caption_item in captions_locales:
-            if caption_item.get("locale") in {"en_US", "es_ES"} or caption_item.get("localized_language") in {"English", "Español"}:
-                caption_item["captions_url"] = srt_to_dict(
-                    get_text_from_url(caption_item.get("captions_url"))
-                )
-                captions.append(caption_item)
-                
+        captions = self._process_captions_locales(
+            media.get("video_available_captions_locales")
+        )
+
         return [
             {
                 "type": media.get("__typename"),
@@ -451,7 +506,10 @@ class FacebookContentParser(BaseParser):
         return {
             "type": media_typename or "Photo",
             "id": media.get("id", ""),
-            "url": self._safe_get(photo_media, "photo_image", "uri", default=""),
+            "url": (
+                self._safe_get(photo_media, "photo_image", "uri", default="")
+                or self._safe_get(photo_media, "image", "uri", default="")
+            ),
             "caption": photo_media.get("accessibility_caption", ""),
         }
 
@@ -488,17 +546,12 @@ class FacebookContentParser(BaseParser):
         )
 
         # Captions (con descarga y conversión SRT→dict)
-        raw_captions = self._safe_get(
-            story, "short_form_video_context", "playback_video",
-            "video_available_captions_locales", default=[],
+        captions = self._process_captions_locales(
+            self._safe_get(
+                story, "short_form_video_context", "playback_video",
+                "video_available_captions_locales", default=[],
+            )
         )
-        captions = []
-        for caption_item in raw_captions:
-            if caption_item.get("locale") in {"en_US", "es_ES"} or caption_item.get("localized_language") in {"English", "Español"}:
-                caption_item["captions_url"] = srt_to_dict(
-                    get_text_from_url(caption_item.get("captions_url"))
-                )
-                captions.append(caption_item)
 
         result: dict[str, Any] = {
             "type": content_type,
@@ -649,15 +702,11 @@ class FacebookContentParser(BaseParser):
                     original, "short_form_video_context", "playback_video"
                 )
 
-                captions_raw = self._safe_get(
-                    video, "video_available_captions_locales", default=[]
-                )
-                captions = []
-                for caption_item in captions_raw:
-                    caption_item["captions_url"] = srt_to_dict(
-                        get_text_from_url(caption_item.get("captions_url"))
+                captions = self._process_captions_locales(
+                    self._safe_get(
+                        video, "video_available_captions_locales", default=[]
                     )
-                    captions.append(caption_item)
+                )
 
                 attachment: list[dict] = []
                 if video:
@@ -697,7 +746,10 @@ class FacebookContentParser(BaseParser):
                             or f"https://www.facebook.com/profile.php?id={owner_id}"
                         ),
                         "avatar": self._safe_get(owner, "displayPicture", "uri") if owner else "",
-                        "is_verified": self._safe_get(owner, "is_verified", default=False) if owner else False,
+                        "is_verified": (
+                            self._safe_get(owner, "is_verified", default=False)
+                            if owner else False
+                        ),
                     },
                     "attachments": attachment,
                 }
@@ -705,6 +757,36 @@ class FacebookContentParser(BaseParser):
             logger.debug("No se encontró reel compartido: %s", exc)
 
         return None
+
+    def _process_captions_locales(
+        self, captions_locales: list | None
+    ) -> list[dict]:
+        """Procesa los subtítulos de un vídeo con el patrón canónico.
+
+        Lee ``video_available_captions_locales``, filtra por los idiomas de
+        interés (en_US/es_ES o English/Español) y convierte cada URL externa
+        a un dict con las frases del SRT. Mismo comportamiento que
+        ``_extract_technical_metadata`` del parser de vídeo.
+
+        Args:
+            captions_locales: Lista de nodos de locales de subtítulos, o None.
+
+        Returns:
+            Lista de dicts de subtítulos procesados.
+        """
+        captions: list[dict] = []
+        for caption_item in captions_locales or []:
+            if not isinstance(caption_item, dict):
+                continue
+            if (
+                caption_item.get("locale") in {"en_US", "es_ES"}
+                or caption_item.get("localized_language") in {"English", "Español"}
+            ):
+                caption_item["captions_url"] = srt_to_dict(
+                    get_text_from_url(caption_item.get("captions_url"))
+                )
+                captions.append(caption_item)
+        return captions
 
     def _extract_shared_post(self, story: dict) -> dict[str, Any] | None:
         """Extrae un post regular compartido via ``attached_story`` (uso interno).
@@ -773,7 +855,9 @@ class FacebookContentParser(BaseParser):
                             url = self._safe_get(
                                 media, "videoDeliveryLegacyFields", "browser_native_sd_url"
                             )
-                            caption = str(media.get("video_available_captions_locales", []))
+                            caption = self._process_captions_locales(
+                                media.get("video_available_captions_locales", [])
+                            )
                         else:
                             url = self._safe_get(media, "photo_image", "uri")
                             caption = media.get("accessibility_caption", "")
@@ -825,6 +909,696 @@ class FacebookContentParser(BaseParser):
                 traceback.print_exc()
 
         return None
+
+    # ==================================================================
+    # CONSTRUCCIÓN DE POSTS DESDE EDGES/STORIES (COMPARTIDO)
+    #
+    # Estos métodos son reutilizados por PostParser y GroupParser para
+    # normalizar cualquier nodo Story/edge a un dict de post canónico.
+    # Operan sobre el nodo recibido (nunca sobre self.result) y no
+    # redisparan el parseo de tráfico, evitando recursión.
+    # ==================================================================
+
+    def _extract_basic_info(
+        self, edge: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        """Extrae id, timestamp de publicación y URL permanente del post.
+
+        Args:
+            edge: Nodo/post del que extraer. Si es ``None`` se usa
+                ``self._story`` (solo PostParser).
+
+        Returns:
+            Dict con ``id``, ``posted_at`` y ``permalink_url``.
+        """
+        target_story = edge if edge is not None else getattr(self, "_story", {})
+        final_url = self.final_url if edge is None else None
+
+        if not isinstance(target_story, dict):
+            return {
+                "id": "unknown",
+                "posted_at": None,
+                "permalink_url": final_url,
+            }
+
+        creation_time = self._safe_get(
+            target_story, "comet_sections", "timestamp", "story", "creation_time"
+        )
+
+        return {
+            "id": self._safe_get(target_story, "post_id", default="unknown"),
+            "posted_at": self._parse_timestamp(creation_time),
+            "permalink_url": target_story.get("permalink_url", final_url),
+        }
+
+    def _extract_content(
+        self, story: dict[str, Any] | None = None
+    ) -> dict[str, str]:
+        """Extrae el texto principal del story.
+
+        Args:
+            story: Nodo del que extraer. Si es ``None`` se usa ``self._story``.
+
+        Returns:
+            Dict con la clave ``text``.
+        """
+        target_story = story if story is not None else getattr(self, "_story", {})
+
+        if not isinstance(target_story, dict):
+            return {"text": ""}
+
+        message = self._safe_get(
+            target_story, "comet_sections", "content", "story", "message"
+        )
+        extracted_text = (
+            self._safe_get(message, "text", default="")
+            if isinstance(message, dict)
+            else ""
+        )
+        return {"text": extracted_text}
+
+    def _extract_comments(
+        self, story: dict | None = None
+    ) -> list[dict[str, Any]]:
+        """Extrae los comentarios visibles de un story.
+
+        Args:
+            story: Nodo del que extraer. Si es ``None`` se usa ``self._story``.
+
+        Returns:
+            Lista de dicts de comentarios, o lista vacía.
+        """
+        target_story = story if story is not None else getattr(self, "_story", {})
+
+        comments_node = self._safe_get(
+            target_story,
+            "comet_sections", "feedback", "story",
+            "story_ufi_container", "story",
+            "feedback_context", "feedback_target_with_context",
+            "comment_list_renderer", "feedback",
+            "comment_rendering_instance_for_feed_location", "comments",
+        )
+
+        if not isinstance(comments_node, dict):
+            return []
+
+        edges = self._safe_get(comments_node, "edges", default=[])
+        if not isinstance(edges, list):
+            return []
+
+        return [
+            self._build_comment_dict(node)
+            for edge in edges
+            if isinstance(edge, dict)
+            and isinstance((node := edge.get("node")), dict)
+            and node
+        ]
+
+    def _extract_attachments_fallback(
+        self, search_root: dict
+    ) -> list[dict[str, Any]]:
+        """Extrae adjuntos buscando nodos ``StoryAttachment`` via DFS.
+
+        Se invoca cuando ``_extract_attachments_common`` devuelve vacío.
+        Usa nodos con ``target`` y ``styles`` (versión canónica) para
+        normalizar el media en ``styles.attachment.media``.
+
+        Args:
+            search_root: Subtree del JSON donde buscar.
+
+        Returns:
+            Lista de dicts de adjuntos normalizados.
+        """
+        raw_nodes: list[dict] = self._find_all_nodes(
+            search_root,
+            condition=lambda n: (
+                n.get("__typename") == "StoryAttachment"
+                and "target" in n
+                and "styles" in n
+            ),
+        )
+
+        if not raw_nodes:
+            logger.debug(
+                "Fallback attachments: no se encontraron nodos StoryAttachment con 'target'."
+            )
+            return []
+
+        attachments: list[dict[str, Any]] = []
+        seen_dedup_keys: set[str] = set()
+
+        for node in raw_nodes:
+            dedup_key = node.get("deduplication_key")
+            if dedup_key:
+                if dedup_key in seen_dedup_keys:
+                    continue
+                seen_dedup_keys.add(dedup_key)
+
+            style_list: list[str] = node.get("style_list") or []
+            primary_style: str = style_list[0] if style_list else "unknown"
+            styles: dict = node.get("styles") or {}
+            attachment_data: dict = styles.get("attachment") or {}
+            media: dict = attachment_data.get("media") or {}
+
+            built = self._build_attachment_from_media(
+                media=media,
+                style_typename=styles.get("__typename") or "",
+                primary_style=primary_style,
+                attachment_data=attachment_data,
+            )
+
+            sub_nodes: list[dict] = self._safe_get(
+                node, "all_subattachments", "nodes", default=[]
+            )
+            if sub_nodes:
+                built["type"] = "album"
+                built["items"] = [
+                    self._build_attachment_from_media(
+                        media=sub.get("media") or {},
+                        style_typename="",
+                        primary_style="photo",
+                        attachment_data={},
+                    )
+                    for sub in sub_nodes
+                    if sub.get("media")
+                ]
+
+            attachments.append(built)
+
+        return attachments
+
+    def _build_attachment_from_media(
+        self,
+        media: dict,
+        style_typename: str,
+        primary_style: str,
+        attachment_data: dict,
+    ) -> dict[str, Any]:
+        """Normaliza un nodo ``media`` en un dict de adjunto canónico."""
+        media_typename: str = media.get("__typename") or ""
+        is_photo = (
+            "Photo" in style_typename or "Photo" in media_typename or primary_style == "photo"
+        )
+        is_video = (
+            "Video" in style_typename or "Video" in media_typename or primary_style == "video"
+        )
+        is_link = "Link" in style_typename or primary_style == "link"
+
+        if is_photo:
+            photo_image: dict = media.get("photo_image") or {}
+            return {
+                "type": media.get("__typename") or "Photo",
+                "id": media.get("id"),
+                "url": photo_image.get("uri"),
+                "caption": media.get("accessibility_caption", ""),
+            }
+
+        if is_video:
+            thumbnail: dict = media.get("thumbnailImage") or {}
+            return {
+                "type": media.get("__typename") or "Video",
+                "id": media.get("id"),
+                "url": self._safe_get(
+                    media, "videoDeliveryLegacyFields", "browser_native_sd_url", default=""
+                ),
+                "thumbnail_url": thumbnail.get("uri", ""),
+                "caption": self._process_captions_locales(
+                    media.get("video_available_captions_locales")
+                ),
+            }
+
+        if is_link:
+            return {
+                "type": "link",
+                "url": self._safe_get(attachment_data, "url"),
+                "title": self._safe_get(attachment_data, "title", "text"),
+                "description": self._safe_get(attachment_data, "description", "text"),
+                "caption": self._safe_get(media, "accessibility_caption", default=""),
+            }
+
+        return {
+            "type": primary_style or "unknown",
+            "id": media.get("id"),
+            "url": media.get("url"),
+            "caption": "",
+        }
+
+    def _extract_original_post_fallback(
+        self, story: dict
+    ) -> dict[str, Any] | None:
+        """Extrae el post original combinando las dos ramas de attached_story."""
+
+        top_attached: dict = story.get("attached_story") or {}
+        content_attached: dict = (
+            self._safe_get(
+                story, "comet_sections", "content", "story", "attached_story"
+            )
+            or {}
+        )
+
+        if not top_attached and not content_attached:
+            return None
+
+        # El post original real puede estar un nivel más profundo:
+        # attached_story.comet_sections.content.story (highlight units).
+        # Ahí viven post_id, url, actors, attachments y message reales.
+        deep_attached: dict = (
+            self._safe_get(
+                content_attached,
+                "comet_sections", "content", "story",
+            )
+            or {}
+        )
+        source: dict = deep_attached or content_attached
+
+        text: str = (
+            self._safe_get(
+                deep_attached, "comet_sections", "message",
+                "story", "message", "text", default="",
+            )
+            or self._safe_get(
+                deep_attached, "comet_sections", "message_container",
+                "story", "message", "text", default="",
+            )
+            or self._safe_get(
+                deep_attached, "message", "text", default="",
+            )
+            or self._safe_get(
+                content_attached, "comet_sections", "message",
+                "story", "message", "text", default="",
+            )
+            or self._safe_get(
+                content_attached, "comet_sections", "message_container",
+                "story", "message", "text", default="",
+            )
+            or self._safe_get(content_attached, "message", "text", default="")
+            or ""
+        )
+
+        actor_from_top: dict = (
+            self._safe_get(
+                top_attached,
+                "comet_sections", "context_layout", "story",
+                "comet_sections", "actor_photo", "story",
+                "actors", default=[{}],
+            )[0]
+            if isinstance(
+                self._safe_get(
+                    top_attached,
+                    "comet_sections", "context_layout", "story",
+                    "comet_sections", "actor_photo", "story",
+                    "actors", default=None,
+                ),
+                list,
+            )
+            else {}
+        )
+        actor_from_content: dict = (
+            source.get("actors") or content_attached.get("actors") or [{}]
+        )[0]
+        # En highlights el actor del post original vive en
+        # context_layout.actor_photo (con name) o en content.story.actors
+        # (solo id+avatar). Priorizamos el que tenga name.
+        actor_from_ctx: dict = (
+            self._safe_get(
+                content_attached,
+                "comet_sections", "context_layout", "story",
+                "comet_sections", "actor_photo", "story",
+                "actors", default=[{}],
+            )[0]
+            if isinstance(
+                self._safe_get(
+                    content_attached,
+                    "comet_sections", "context_layout", "story",
+                    "comet_sections", "actor_photo", "story",
+                    "actors", default=None,
+                ),
+                list,
+            )
+            else {}
+        )
+        actor: dict = actor_from_top or actor_from_content
+        if not actor.get("name"):
+            actor = actor_from_ctx or actor_from_content
+
+        author: dict[str, Any] = {
+            "id": actor.get("id"),
+            "name": actor.get("name") or actor.get("__typename"),
+            "url": actor.get("url") or actor.get("profile_url"),
+            "avatar": self._safe_get(actor, "profile_picture", "uri", default=""),
+            "is_verified": actor.get("is_verified", False),
+            "work_info": actor.get("work_info", ""),
+        }
+
+        metadata_list: list = (
+            self._safe_get(
+                top_attached,
+                "comet_sections", "context_layout", "story",
+                "comet_sections", "metadata",
+                default=[],
+            )
+            or []
+        )
+        creation_time = None
+        for meta_item in metadata_list:
+            creation_time = self._safe_get(meta_item, "story", "creation_time")
+            if creation_time:
+                break
+
+        post_id: str = (
+            deep_attached.get("post_id")
+            or content_attached.get("post_id")
+            or top_attached.get("id")
+            or ""
+        )
+        permalink_url: str = (
+            deep_attached.get("url")
+            or top_attached.get("permalink_url")
+            or (top_attached.get("url") if isinstance(top_attached.get("url"), str) else "")
+            or self._safe_get(
+                top_attached,
+                "comet_sections", "context_layout", "story",
+                "comet_sections", "metadata", default=[{}],
+            )[0]
+            and self._safe_get(
+                top_attached,
+                "comet_sections", "context_layout", "story",
+                "comet_sections", "metadata", default=[{}],
+            )[0].get("story", {}).get("url", "")
+            or ""
+        )
+
+        original_attachments: list[dict] = (
+            self._extract_attachments_common(deep_attached)
+            or self._extract_attachments_common(content_attached)
+            or (self._extract_attachments_fallback(top_attached) if top_attached else [])
+        )
+
+        return {
+            "id": post_id,
+            "text": text,
+            "permalink_url": permalink_url,
+            "posted_at": self._parse_timestamp(creation_time),
+            "author": author,
+            "attachments": original_attachments,
+        }
+
+    def _build_comment_dict(self, node: dict) -> dict[str, Any]:
+        """Construye el dict normalizado de un comentario."""
+        author = node.get("author", {})
+        author_id = author.get("id", "")
+
+        reactions = [
+            {
+                "id": self._safe_get(edge, "node", "id"),
+                "count": edge.get("reaction_count", 0),
+            }
+            for edge in self._safe_get(
+                node, "feedback", "top_reactions", "edges", default=[]
+            )
+        ]
+
+        return {
+            "id": node.get("legacy_fbid"),
+            "depth": node.get("depth", 0),
+            "text": self._safe_get(node, "body", "text"),
+            "created_at": self._parse_timestamp(node.get("created_time")),
+            "author": {
+                "id": author_id,
+                "name": author.get("name", ""),
+                "profile_url": (
+                    author.get("url")
+                    or f"https://www.facebook.com/profile.php?id={author_id}"
+                ),
+                "gender": author.get("gender", ""),
+                "avatar": self._safe_get(
+                    author, "profile_picture_depth_0_increased", "uri"
+                ),
+            },
+            "replies_count": self._safe_get(
+                node, "feedback", "replies_fields", "total_count", default=0
+            ),
+            "reactions": reactions,
+            "reaction_count": self._safe_get(
+                node, "feedback", "reactors", "count_reduced", default=0
+            ),
+        }
+
+    def parse_edge(self, edge: dict) -> dict[str, Any]:
+        """Construye un dict de post desde un edge/nodo Story del GraphQL.
+
+        Método puro: opera sobre ``edge`` y no muta ``self.result`` ni
+        redispara el parseo de tráfico. Usado por PostParser y GroupParser.
+
+        Args:
+            edge: Nodo Story con los datos del post.
+
+        Returns:
+            Dict con los campos del post.
+        """
+        post: dict[str, Any] = {}
+
+        try:
+            post |= self._extract_basic_info(edge)
+            post["author"] = self._extract_author_common(edge)
+            post |= self._extract_content(edge)
+            post["attachments"] = self._extract_attachments_common(edge)
+            post["comments"] = self._extract_comments(edge)
+            post.update(self._extract_feedback_common(edge))
+
+            msg_ranges = (
+                self._safe_get(
+                    edge, "comet_sections", "content", "story",
+                    "comet_sections", "message", "story", "message", "ranges",
+                    default=[],
+                )
+                or self._safe_get(
+                    edge, "comet_sections", "content", "story",
+                    "comet_sections", "message_container", "story", "message", "ranges",
+                    default=[],
+                )
+                or []
+            )
+            hashtags, mentions = self._parse_ranges(msg_ranges)
+            post["hashtags"] = hashtags
+            post["mentions"] = mentions
+
+            group = self._extract_group_common(edge)
+            if group is not None:
+                post["group"] = group
+
+            has_attached_story = bool(
+                edge.get("attached_story")
+                or self._safe_get(
+                    edge, "comet_sections", "content", "story", "attached_story"
+                )
+            )
+
+            if has_attached_story:
+                original_post = self._extract_original_post_common(edge)
+                if not original_post:
+                    original_post = self._extract_original_post_fallback(edge)
+                elif not original_post.get("attachments"):
+                    top_attached: dict = edge.get("attached_story") or {}
+                    if top_attached:
+                        retried_atts = self._extract_attachments_fallback(top_attached)
+                        if retried_atts:
+                            original_post["attachments"] = retried_atts
+
+                if original_post:
+                    post["original_post"] = original_post
+
+            post["is_sponsored"] = edge.get("sponsored_data") is not None
+
+        except Exception as exc:
+            post["error"] = str(exc)
+            logger.error("Error parseando edge: %s", exc)
+            if getattr(self, "debug", False):
+                import traceback
+                traceback.print_exc()
+
+        return post
+
+    def _add_story_to_feed(self, story: dict, seen_ids: set[str]) -> None:
+        """Construye un dict de post desde un nodo Story y lo añade al feed.
+
+        Args:
+            story:    Nodo Story del JSON.
+            seen_ids: Set mutable de post_ids ya procesados.
+        """
+        post_id = story.get("post_id") or self._find_post_id_in_story(story)
+        if not post_id or post_id in seen_ids:
+            return
+        seen_ids.add(str(post_id))
+
+        try:
+            post = self.parse_edge(story)
+            self.result["feed"].append(post)
+        except Exception as exc:
+            logger.debug("_add_story_to_feed error post_id=%s: %s", post_id, exc)
+
+    def _process_traffic_fragment(
+        self, fragment: dict[str, Any], seen_ids: set[str]
+    ) -> int:
+        """Procesa un fragmento JSON del tráfico GraphQL.
+
+        Busca Stories en ``data.node`` (relay paginado), en
+        ``data.group.group_feed.edges`` y en ``data.node`` tipo ``Group``
+        con ``group_feed.edges`` (feed de grupo paginado).
+
+        Args:
+            fragment: Fragmento JSON normalizado.
+            seen_ids: Set mutable de post_ids ya procesados.
+
+        Returns:
+            Número de posts añadidos.
+        """
+        added = 0
+        data = fragment.get("data") or {}
+        node = data.get("node") or {}
+
+        # Patrón 1: relay paginado → data.node es la Story
+        if node.get("__typename") == "Story" and node.get("post_id"):
+            self._add_story_to_feed(node, seen_ids)
+            return 1
+
+        # Patrón 2: data.node es Group con group_feed.edges (feed de grupo)
+        if node.get("__typename") == "Group":
+            for edge in (node.get("group_feed") or {}).get("edges") or []:
+                story = edge.get("node") or {}
+                if story.get("__typename") == "Story" and story.get("post_id"):
+                    prev = len(seen_ids)
+                    self._add_story_to_feed(story, seen_ids)
+                    if len(seen_ids) > prev:
+                        added += 1
+
+        # Patrón 3: data.group.group_feed.edges (feed completo)
+        group = data.get("group") or {}
+        for edge in (group.get("group_feed") or {}).get("edges") or []:
+            story = edge.get("node") or {}
+            if story.get("__typename") == "Story" and story.get("post_id"):
+                prev = len(seen_ids)
+                self._add_story_to_feed(story, seen_ids)
+                if len(seen_ids) > prev:
+                    added += 1
+
+        # Patrón 4: búsqueda profunda como fallback
+        if not added:
+            stories = self._find_all_nodes(
+                data,
+                condition=lambda n: (
+                    n.get("__typename") == "Story"
+                    and bool(n.get("post_id"))
+                    and "comet_sections" in n
+                ),
+            )
+            for story in stories:
+                prev = len(seen_ids)
+                self._add_story_to_feed(story, seen_ids)
+                if len(seen_ids) > prev:
+                    added += 1
+
+        return added
+
+    def _find_post_id_in_story(self, story: dict) -> str | None:
+        """Busca el ``post_id`` de un Story desde sus secciones anidadas.
+
+        Args:
+            story: Nodo Story.
+
+        Returns:
+            post_id como string, o None si no se encuentra.
+        """
+        if story.get("post_id"):
+            return str(story["post_id"])
+        cs = story.get("comet_sections") or {}
+        ts_url = self._safe_get(cs, "timestamp", "story", "url") or ""
+        m = re.search(r"/posts/(\d+)", ts_url)
+        if m:
+            return m.group(1)
+        return self._safe_get(cs, "content", "story", "post_id")
+
+    def _normalize_highlight_story(self, story: dict) -> dict:
+        """Promueve los campos de un nodo highlight a la forma estándar de Story.
+
+        Los nodos de highlight (``highlight_units.edges[].node.story``) tienen
+        una estructura distinta a las Stories del feed: el id/texto viven en
+        ``comet_sections.content.story`` y el timestamp en ``context_layout``
+        metadata. Este método normaliza esas rutas para que ``parse_edge``
+        pueda procesarlos.
+
+        Args:
+            story: Nodo story de un highlight unit.
+
+        Returns:
+            Dict normalizado con la forma estándar de Story.
+        """
+        normalized = dict(story)
+        cs = story.get("comet_sections") or {}
+        content_story = cs.get("content", {}).get("story") or {}
+
+        post_id = content_story.get("post_id") or story.get("post_id")
+        if post_id:
+            normalized["post_id"] = post_id
+
+        ts_url = (
+            self._safe_get(cs, "timestamp", "story", "url")
+            or content_story.get("url")
+            or story.get("url")
+        )
+        normalized["permalink_url"] = (
+            story.get("permalink_url") or content_story.get("url") or ""
+        )
+
+        # Mensaje real: content.story.comet_sections.message/message_container
+        inner = content_story.get("comet_sections") or {}
+        real_msg = (
+            self._safe_get(inner, "message", "story", "message")
+            or self._safe_get(inner, "message_container", "story", "message")
+            or content_story.get("message")
+            or {}
+        )
+        # Fallback profundo: highlights compartidos (reshare) anidan el texto
+        # en attached_story.comet_sections.content.story.comet_sections.
+        if not (real_msg or {}).get("text"):
+            deep_attached = (
+                self._safe_get(
+                    content_story,
+                    "attached_story", "comet_sections", "content", "story",
+                    "comet_sections",
+                )
+                or {}
+            )
+            real_msg = (
+                self._safe_get(deep_attached, "message", "story", "message")
+                or self._safe_get(
+                    deep_attached, "message_container", "story", "message"
+                )
+                or {}
+            )
+        content_story["message"] = real_msg
+
+        if content_story.get("attachments"):
+            normalized["attachments"] = content_story["attachments"]
+
+        # Timestamp desde context_layout metadata
+        creation_time = None
+        layouts = cs.get("context_layout", {}).get("story") or {}
+        ts_nodes = self._find_all_nodes(
+            layouts,
+            condition=lambda n: n.get("__typename")
+            == "CometFeedStoryMinimizedTimestampStrategy",
+        )
+        if ts_nodes:
+            creation_time = self._safe_get(ts_nodes[0], "story", "creation_time")
+
+        ts_section = normalized.setdefault("comet_sections", {}) \
+            .setdefault("timestamp", {}) \
+            .setdefault("story", {})
+        ts_section["creation_time"] = creation_time
+        ts_section["url"] = ts_url
+
+        return normalized
 
     # ==================================================================
     # PARSEO DE TRÁFICO GRAPHQL

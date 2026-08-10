@@ -6,14 +6,14 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con soporte de cuentas autenticadas">
+        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con cuentas autenticadas, almacenamiento configurable (local/PostgreSQL/MongoDB) y anti-detección integrada">
       
       
         <meta name="author" content="Reaper Contributors">
       
       
       
-        <link rel="prev" href="../../technical/extending/">
+        <link rel="prev" href="../../anti_scraping/">
       
       
         <link rel="next" href="../auth/">
@@ -500,6 +500,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Almacenamiento (local/PG/Mongo)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user/login/" class="md-nav__link">
         
   
@@ -849,6 +877,34 @@
     
   
     Extender Reaper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../anti_scraping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Anti-Detección (anti_detection)
   
 
     
@@ -1480,7 +1536,8 @@ desde el paquete <code>reaper</code> sin necesidad de acceder a submódulos inte
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">proxy_server</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">proxy_username</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">proxy_password</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">account</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 </code></pre></div>
 
     <div class="doc doc-contents first">
@@ -1665,6 +1722,24 @@ usar la clase <code>Reaper</code> directamente, ya que reutiliza el
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>account</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Cuenta a forzar en esta sesión (account_id, username
+             o ID de usuario de la plataforma). Requiere
+             <code>account_manager</code>. <code>None</code> = rotación automática.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -1753,6 +1828,13 @@ await manager.add_account(&quot;facebook&quot;, &quot;usuario&quot;, cookies=[..
 result = await scrape(
     &quot;https://www.facebook.com/reel/123&quot;,
     account_manager=manager,
+)
+
+# Forzar una cuenta concreta por username
+result = await scrape(
+    &quot;https://www.facebook.com/reel/123&quot;,
+    account_manager=manager,
+    account=&quot;mi_usuario@gmail.com&quot;,
 )
 </code></pre></div>
 
@@ -1874,7 +1956,8 @@ result = await reaper.scrape(&quot;https://www.facebook.com/reel/123&quot;)
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">proxy_server</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">proxy_username</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">proxy_password</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">account</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2037,6 +2120,26 @@ result = await reaper.scrape(&quot;https://www.facebook.com/reel/123&quot;)
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>account</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Identificador de la cuenta a forzar en esta sesión:
+            <code>account_id</code> (UUID4), <code>username</code> o ID de usuario
+            de la plataforma (<code>c_user</code>/<code>ds_user_id</code>).
+            <code>None</code> = rotación automática. Requiere que el
+            <code>Reaper</code> se haya construido con <code>account_manager</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -2057,6 +2160,16 @@ result = await reaper.scrape(&quot;https://www.facebook.com/reel/123&quot;)
             <td>
               <div class="doc-md-description">
                 <p><code>dict[str, Any]</code> con los datos scrapeados.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Siempre incluye: <code>url</code>, <code>platform</code>, <code>status</code>.</p>
               </div>
             </td>
           </tr>

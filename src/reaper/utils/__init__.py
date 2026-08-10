@@ -5,6 +5,12 @@ from reaper.utils.metrics import SocialMediaParser
 from reaper.utils.encoding import datetime_encoder, decode_alphanumeric_id
 from reaper.utils.http import get_text_from_url
 from reaper.utils.logger import get_logger, setup_logging, DebugContext
+from reaper.utils.fb_helpers import (
+    extraer_id_video_facebook,
+    generate_fb_recent_search_url,
+    is_facebook_video_url,
+    normalizar_url_facebook,
+)
 
 from reaper.utils.platforms import (
     FACEBOOK_DOMAINS,

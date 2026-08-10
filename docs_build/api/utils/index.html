@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con soporte de cuentas autenticadas">
+        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con cuentas autenticadas, almacenamiento configurable (local/PostgreSQL/MongoDB) y anti-detección integrada">
       
       
         <meta name="author" content="Reaper Contributors">
@@ -500,6 +500,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Almacenamiento (local/PG/Mongo)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user/login/" class="md-nav__link">
         
   
@@ -849,6 +877,34 @@
     
   
     Extender Reaper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../anti_scraping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Anti-Detección (anti_detection)
   
 
     
@@ -2064,6 +2120,11 @@ substring (p. ej. <code>"t.co"</code> no coincide con <code>"snapchat.com"</code
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="go">&#39;GroupParser&#39;</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">get_parser_from_fb_url</span><span class="p">(</span><span class="s2">&quot;https://www.facebook.com/zurdobo7&quot;</span><span class="p">)</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="go">&#39;ProfileParser&#39;</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">get_parser_from_fb_url</span><span class="p">(</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="gp">... </span>    <span class="s2">&quot;https://www.facebook.com/NoticiasTelemundo/posts/&quot;</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="gp">... </span>    <span class="s2">&quot;-liveblog-l-la-casa-blanca/1532119218279349/&quot;</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="gp">... </span><span class="p">)</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="go">&#39;PostParser&#39;</span>
 </code></pre></div>
 
 
@@ -2088,16 +2149,18 @@ substring (p. ej. <code>"t.co"</code> no coincide con <code>"snapchat.com"</code
 
     <div class="doc doc-contents first">
 
-        <p>Detecta si el HTML de Facebook indica que se requiere autenticación.</p>
-<p>Analiza el HTML en tres capas en orden de prioridad:</p>
-<div class="highlight"><pre><span></span><code>1. Presencia de señales de contenido real (early exit: NO bloqueado)
-2. URL final redirigida a /login o /checkpoint
-3. Señales JSON fuertes (tracePolicy, canonicalRouteName)
-4. Señales JSON combinadas (CometErrorRoot + privacy)
+        <p>Detecta si el HTML de Facebook o Instagram indica que se requiere autenticación.</p>
+<p>Analiza el HTML en capas ordenadas de más específica a más general.
+El orden es crítico: capas más específicas deben ejecutarse primero
+para evitar que señales generales produzcan falsos negativos.</p>
+<div class="highlight"><pre><span></span><code>1. Contenido explícitamente no disponible — dos niveles de señales:
+     · JSON (ScheduledServerJS, HTML SSR): canonicalRouteName, tracePolicy
+     · DOM (post-hidratación): &lt;title&gt;, &lt;span&gt; con texto de error
+2. Presencia de señales de contenido real (early exit: NO bloqueado)
+3. URL final redirigida a /login, /checkpoint (FB) o /accounts/login (IG)
+4. Señales JSON fuertes (tracePolicy, canonicalRouteName) — solo Facebook
+5. Señales JSON combinadas (CometErrorRoot + privacy) — solo Facebook
 </code></pre></div>
-<p>La función NO usa elementos del DOM (<code>div[role="dialog"]</code> etc.) para
-evitar falsos positivos con popups de onboarding o banners de cookies
-que aparecen en páginas con contenido accesible.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -2120,7 +2183,7 @@ que aparecen en páginas con contenido accesible.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>HTML renderizado por Playwright.</p>
+                <p>HTML renderizado por Playwright (SSR o post-hidratación).</p>
               </div>
             </td>
             <td>
@@ -2167,22 +2230,13 @@ que aparecen en páginas con contenido accesible.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>class:<code>AuthResult</code> con <code>requires_auth=True</code> y la <code>reason</code></p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="            reaper.utils.fb_auth_detector.AuthResult
-
-
-  
-      dataclass
-  " href="#reaper.utils.fb_auth_detector.AuthResult">AuthResult</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>de la primera señal detectada.</p>
+                <p>class:<code>AuthResult</code>:
+- <code>requires_auth=False</code> + <code>auth_type="content_unavailable"</code> si
+  el contenido fue eliminado o restringido permanentemente (FB e IG).
+- <code>requires_auth=False</code> sin <code>auth_type</code> si la página tiene
+  contenido real.
+- <code>requires_auth=True</code> con <code>auth_type</code> correspondiente si hay
+  muro de auth.</p>
               </div>
             </td>
           </tr>

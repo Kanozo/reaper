@@ -121,6 +121,11 @@ class ScraperConfig:
     # None = modo anónimo (comportamiento original, 100% compatible hacia atrás).
     account_manager: Any = field(default=None, repr=False)
 
+    # Identificador de la cuenta a forzar en cada petición de esta sesión.
+    # Acepta account_id (UUID4), username o ID de usuario de la plataforma
+    # (c_user / ds_user_id). None = rotación automática del AccountManager.
+    preferred_account: str | None = None
+
     # ──────────────────────────────────────────────────────────────────────────
 
     def __post_init__(self) -> None:

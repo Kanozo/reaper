@@ -22,7 +22,7 @@ build-backend = "setuptools.build_meta"
 # ------------------------------------------------------------------------------
 [project]
 name        = "reaper"
-version     = "0.1.1"
+version     = "0.3.0"
 description = "Librería Python para scraping de Facebook e Instagram"
 readme      = "README.md"
 license     = { text = "MIT" }
@@ -47,6 +47,13 @@ dev = [
     "pytest-asyncio>=0.23",     # Soporte async en pytest
     "ruff>=0.4",                # Linter y formateador
     "mypy>=1.10",               # Verificación de tipos estática
+]
+
+# Backends de base de datos para el almacenamiento de cuentas.
+# Instalar con: pip install "reaper[db]"
+db = [
+    "asyncpg>=0.29",   # Driver PostgreSQL (PostgresStorage)
+    "motor>=3.3",      # Driver MongoDB async (MongoStorage)
 ]
 
 # ------------------------------------------------------------------------------

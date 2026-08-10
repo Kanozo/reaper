@@ -99,6 +99,60 @@ asyncio.run(main())
 Reaper selecciona la cuenta óptima automáticamente. No necesitas indicar
 cuál usar en cada petición.
 
+## Forzar una cuenta concreta
+
+Puedes especificar la cuenta a usar en una petición o sesión, identificándola
+por su `account_id` (UUID interno), su `username` o su ID de usuario de la
+plataforma (`c_user` en Facebook, `ds_user_id` en Instagram):
+
+```python
+import asyncio
+from reaper import scrape, Reaper, AccountManager
+
+async def main():
+    manager = AccountManager()
+
+    # Por username
+    result = await scrape(
+        "https://www.facebook.com/reel/123456",
+        account_manager=manager,
+        account="mi_usuario@gmail.com",
+    )
+
+    # Por ID de usuario de Facebook (c_user de las cookies)
+    result = await scrape(
+        "https://www.facebook.com/reel/123456",
+        account_manager=manager,
+        account="1000123456789",
+    )
+
+    # Por account_id (UUID interno), reutilizando el manager entre peticiones
+    reaper = Reaper(account_manager=manager)
+    result = await reaper.scrape(
+        "https://www.instagram.com/p/abc/",
+        account="b3c8f0a2-...-f0a2",
+    )
+
+asyncio.run(main())
+```
+
+!!! info "Comportamiento"
+    - Si la cuenta indicada no existe, Reaper avisa por log y continúa en modo
+      anónimo.
+    - Si la cuenta no es seleccionable (suspendida o con cookies expiradas),
+      se avisa pero se intenta usar igualmente porque la pediste explícitamente.
+    - Desde la CLI: `reaper <url> --account mi_usuario@gmail.com`.
+
+### Localizar una cuenta manualmente
+
+```python
+async def buscar():
+    manager = AccountManager()
+    cuenta = await manager.resolve_account("mi_usuario@gmail.com")
+    cuenta = await manager.resolve_account("1000123456789", platform="facebook")
+    print(cuenta.account_id if cuenta else "No encontrada")
+```
+
 ## Gestionar el pool de cuentas
 
 ```python

@@ -47,8 +47,9 @@ from datetime import datetime, timezone
 from typing import NamedTuple
 
 from reaper.auth.models import AccountProfile, AccountStatus, NON_SELECTABLE_STATUSES
+from reaper.utils.logger import get_logger
 
-logger = logging.getLogger("reaper.auth.rotator")
+logger = get_logger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Pesos del algoritmo de puntuación

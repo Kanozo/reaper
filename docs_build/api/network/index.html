@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con soporte de cuentas autenticadas">
+        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con cuentas autenticadas, almacenamiento configurable (local/PostgreSQL/MongoDB) y anti-detección integrada">
       
       
         <meta name="author" content="Reaper Contributors">
@@ -500,6 +500,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Almacenamiento (local/PG/Mongo)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user/login/" class="md-nav__link">
         
   
@@ -849,6 +877,34 @@
     
   
     Extender Reaper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../anti_scraping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Anti-Detección (anti_detection)
   
 
     
@@ -1253,6 +1309,61 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#persistencia-y-analisis-offline-de-sesiones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistencia y análisis offline de sesiones
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reaper.network.content_fetcher.serialize_traffic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;serialize_traffic
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reaper.network.content_fetcher.deserialize_traffic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;deserialize_traffic
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reaper.network.content_fetcher.load_debug_session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;load_debug_session
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reaper.network.content_fetcher.list_debug_sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;list_debug_sessions
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1583,6 +1694,61 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#persistencia-y-analisis-offline-de-sesiones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistencia y análisis offline de sesiones
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reaper.network.content_fetcher.serialize_traffic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;serialize_traffic
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reaper.network.content_fetcher.deserialize_traffic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;deserialize_traffic
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reaper.network.content_fetcher.load_debug_session" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;load_debug_session
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reaper.network.content_fetcher.list_debug_sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;list_debug_sessions
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1601,6 +1767,10 @@
 
 
 <h1 id="api-reference-reapernetwork">API Reference — <code>reaper.network</code><a class="headerlink" href="#api-reference-reapernetwork" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>Toda la API de esta página es importable directamente desde <code>reaper.network</code>
+(y también desde los submódulos que se indican).</p>
+</blockquote>
 <h2 id="contentfetcher"><code>ContentFetcher</code><a class="headerlink" href="#contentfetcher" title="Permanent link">&para;</a></h2>
 
 
@@ -1648,7 +1818,7 @@ NO parsea, NO interpreta, NO extrae datos de la página.</p>
 <li>Ambos False:              sin scroll (posts simples, Instagram).</li>
 </ul>
 </details>        <p>Uso básico::</p>
-<div class="highlight"><pre><span></span><code>fetcher = ContentFetcher(&quot;https://www.facebook.com/reel/XXXXXX&quot;)
+<div class="highlight"><pre><span></span><code>fetcher = ContentFetcher(&quot;https://www.facebook.com/reel/816043001524221&quot;)
 result = await fetcher.fetch(auto_scroll=True)
 if result.success:
     html = result.html_content
@@ -1807,24 +1977,12 @@ if result.success:
 
     <div class="doc doc-contents ">
 
-        <p>Ejecuta la navegación completa y retorna HTML + tráfico de red.</p>
+        <p>Ejecuta la navegación completa usando Camoufox.</p>
+<p>Camoufox es un Firefox modificado que:
+- Evade detección de Facebook (no muestra logo congelado)
+- Captura tráfico sin errores 0x80004005
+- No requiere stealth JS adicional</p>
 
-
-<details class="flujo-interno" open>
-  <summary>Flujo interno</summary>
-  <ol>
-<li>Crear <code>NetworkInterceptor</code> y <code>FetchResult</code> base.</li>
-<li>Lanzar Firefox con configuración anti-detección.</li>
-<li>Crear contexto (viewport, user-agent, locale, proxy opcional).</li>
-<li><strong>Adjuntar el interceptor ANTES de navegar</strong> (captura desde inicio).</li>
-<li>Navegar a la URL y esperar <code>networkidle</code>.</li>
-<li>(Opcional) Capturar screenshot del contenedor principal.</li>
-<li>(Opcional) Ejecutar scroll (auto o infinity).</li>
-<li>Capturar el HTML final (<code>page.content()</code>).</li>
-<li>(Debug) Guardar artefactos en disco.</li>
-<li>Cerrar navegador y retornar FetchResult.</li>
-</ol>
-</details>
 
 <p><span class="doc-section-title">Parameters:</span></p>
     <table>
@@ -1846,7 +2004,7 @@ if result.success:
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Captura PNG del contenedor <code>div[role='dialog']</code>.</p>
+                <p>Captura PNG del contenedor.</p>
               </div>
             </td>
             <td>
@@ -1878,8 +2036,7 @@ if result.success:
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Scroll monitorizando tráfico de red.
-             Tiene prioridad sobre <code>auto_scroll</code> si ambos True.</p>
+                <p>Scroll monitorizando tráfico de red.</p>
               </div>
             </td>
             <td>
@@ -1943,10 +2100,7 @@ if result.success:
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Lista de cookies en formato Playwright a inyectar
-             en el contexto del navegador antes de navegar.
-             Permite sesiones autenticadas sin login interactivo.
-             <code>None</code> = navegación anónima.</p>
+                <p>Lista de cookies en formato Playwright.</p>
               </div>
             </td>
             <td>
@@ -1978,21 +2132,6 @@ if result.success:
             <td>
               <div class="doc-md-description">
                 <p>FetchResult con HTML renderizado, tráfico capturado y metadatos.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="            reaper.network.interceptor.FetchResult
-
-
-  
-      dataclass
-  " href="#reaper.network.interceptor.FetchResult">FetchResult</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Si falla, <code>success=False</code> y <code>error</code> describe el problema.</p>
               </div>
             </td>
           </tr>
@@ -2321,8 +2460,8 @@ estructurados en lugar de depender únicamente del HTML.</p>
 desde los parsers. Exclusivo para Facebook (graphql) e Instagram (api).</p>
 <p>Uso desde parsers::</p>
 <div class="highlight"><pre><span></span><code>for resp in result.traffic.graphql_responses:
-    if resp.body:
-        data = resp.body.get(&quot;data&quot;, {})
+    for fragment in CapturedTraffic.normalize_body(resp.body):
+        data = fragment.get(&quot;data&quot;, {})
 
 search_responses = result.traffic.graphql_by_operation(&quot;SearchResultsPage&quot;)
 </code></pre></div>
@@ -2593,6 +2732,443 @@ search_responses = result.traffic.graphql_by_operation(&quot;SearchResultsPage&q
 
 
   </div>
+
+    </div>
+
+</div><hr />
+<h2 id="persistencia-y-analisis-offline-de-sesiones">Persistencia y análisis offline de sesiones<a class="headerlink" href="#persistencia-y-analisis-offline-de-sesiones" title="Permanent link">&para;</a></h2>
+<p>Guardado, recarga y consulta de sesiones de debug sin abrir el navegador.</p>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="reaper.network.content_fetcher.serialize_traffic" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">reaper.network.content_fetcher.serialize_traffic</span>
+
+
+<a href="#reaper.network.content_fetcher.serialize_traffic" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">serialize_traffic</span><span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">traffic</span><span class="p">:</span> <span class="n">CapturedTraffic</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Convierte un <code>CapturedTraffic</code> a un dict JSON-serializable.</p>
+<p>Serializa todos los dataclasses anidados convirtiendo los <code>datetime</code>
+a cadenas ISO-8601. Compatible con <code>deserialize_traffic()</code>.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>traffic</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            reaper.network.interceptor.CapturedTraffic
+
+
+  
+      dataclass
+  " href="#reaper.network.interceptor.CapturedTraffic">CapturedTraffic</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Objeto CapturedTraffic retornado por <code>NetworkInterceptor.get_traffic()</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>dict serializable con la siguiente estructura::</p>
+<p>{
+    "version":           "3.0",
+    "captured_at":       "<ISO-8601>",
+    "summary":           "GraphQL: Xreq/Xres | ...",
+    "graphql_requests":  [{CapturedRequest serializado} ...],
+    "graphql_responses": [{CapturedResponse serializado} ...],
+    "api_requests":      [...],
+    "api_responses":     [...]
+}</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+        <p>Example::</p>
+<div class="highlight"><pre><span></span><code>traffic = interceptor.get_traffic()
+data = serialize_traffic(traffic)
+Path(&quot;traffic.json&quot;).write_text(json.dumps(data, indent=2))
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="reaper.network.content_fetcher.deserialize_traffic" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">reaper.network.content_fetcher.deserialize_traffic</span>
+
+
+<a href="#reaper.network.content_fetcher.deserialize_traffic" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">deserialize_traffic</span><span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">session_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CapturedTraffic</span>
+</code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Reconstruye un <code>CapturedTraffic</code> desde un dict serializado con
+:func:<code>serialize_traffic</code>.</p>
+<p>Si <code>session_dir</code> se provee, resuelve los bodies de respuesta que fueron
+guardados como ficheros separados (marcados con el prefijo <code>__FILE__</code>).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>dict cargado desde <code>traffic.json</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>session_dir</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Directorio raíz de la sesión de debug (para resolver
+         referencias <code>__FILE__</code>). Puede ser str o Path.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            reaper.network.interceptor.CapturedTraffic
+
+
+  
+      dataclass
+  " href="#reaper.network.interceptor.CapturedTraffic">CapturedTraffic</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>CapturedTraffic completamente reconstruido con todos sus campos tipados.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+        <p>Example::</p>
+<div class="highlight"><pre><span></span><code>data = json.loads(Path(&quot;debug_artifacts/session/traffic.json&quot;).read_text())
+traffic = deserialize_traffic(data, session_dir=&quot;debug_artifacts/session&quot;)
+
+for resp in traffic.graphql_responses:
+    if resp.body:
+        print(resp.body.get(&quot;data&quot;, {}).keys())
+</code></pre></div>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="reaper.network.content_fetcher.load_debug_session" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">reaper.network.content_fetcher.load_debug_session</span>
+
+
+<a href="#reaper.network.content_fetcher.load_debug_session" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">load_debug_session</span><span class="p">(</span><span class="n">session_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FetchResult</span>
+</code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Carga una sesión de debug guardada en disco y reconstruye un <code>FetchResult</code>
+listo para análisis offline.</p>
+<p>Funciona con sesiones guardadas por <code>ContentFetcher</code> cuando <code>debug=True</code>.
+No requiere abrir un navegador ni hacer peticiones de red::</p>
+<div class="highlight"><pre><span></span><code>from reaper.network import load_debug_session
+
+result = load_debug_session(&quot;data/debug_artifacts/www.facebook.com_reel_20250601_143022&quot;)
+print(result.final_url, result.fetched_at)
+</code></pre></div>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>session_dir</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Ruta al directorio de la sesión de debug.
+         Debe contener al menos <code>meta.json</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            reaper.network.interceptor.FetchResult
+
+
+  
+      dataclass
+  " href="#reaper.network.interceptor.FetchResult">FetchResult</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>FetchResult completamente reconstruido.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="FileNotFoundError">FileNotFoundError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Si <code>session_dir</code> no existe o no contiene <code>meta.json</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Si <code>meta.json</code> tiene formato inválido.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="reaper.network.content_fetcher.list_debug_sessions" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">reaper.network.content_fetcher.list_debug_sessions</span>
+
+
+<a href="#reaper.network.content_fetcher.list_debug_sessions" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">list_debug_sessions</span><span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">base_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">=</span> <span class="s2">&quot;data/debug_artifacts&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Lista todas las sesiones de debug guardadas, ordenadas de más reciente a más antigua.</p>
+<p>Útil para elegir qué sesión cargar con :func:<code>load_debug_session</code>
+o para análisis batch de múltiples sesiones.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>base_dir</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Directorio raíz de artefactos de debug.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;data/debug_artifacts&#39;</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Lista de dicts con metadatos básicos de cada sesión::</p>
+<p>[
+    {
+        "path":            Path("data/debug_artifacts/session_name"),
+        "original_url":    "https://...",
+        "fetched_at":      "2025-01-01T12:00:00",
+        "success":         True,
+        "authenticated":   False,
+        "traffic_summary": "GraphQL: 8req/8res | API: 2req/2res"
+    },
+    ...
+]</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<span title="dict">dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Las sesiones sin <code>meta.json</code> válido se omiten silenciosamente.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+        <p>Example::</p>
+<div class="highlight"><pre><span></span><code>sessions = list_debug_sessions()
+for s in sessions:
+    print(s[&quot;fetched_at&quot;], s[&quot;original_url&quot;][:60], s[&quot;traffic_summary&quot;])
+
+result = load_debug_session(sessions[0][&quot;path&quot;])
+</code></pre></div>
+
 
     </div>
 

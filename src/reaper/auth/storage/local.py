@@ -41,14 +41,14 @@ Ejemplo::
 from __future__ import annotations
 
 import json
-import logging
 from pathlib import Path
 from typing import Any
 
 from reaper.auth.models import AccountActivity, AccountProfile
 from reaper.auth.storage.base import BaseAccountStorage, StorageError
+from reaper.utils.logger import get_logger
 
-logger = logging.getLogger("reaper.auth.storage.local")
+logger = get_logger(__name__)
 
 # Nombre de los archivos dentro del directorio de cada cuenta.
 ACCOUNT_FILENAME: str = "account.json"
@@ -208,13 +208,13 @@ class LocalFileStorage(BaseAccountStorage):
         """
         return self._account_dir(platform, account_id) / COOKIES_FILENAME
 
-    def save_cookies(
+    async def save_cookies(
         self,
         platform: str,
         account_id: str,
         cookies: list[dict[str, Any]],
-    ) -> Path:
-        """Escribe las cookies en disco en formato Playwright.
+    ) -> str:
+        """Persiste las cookies en disco en formato Playwright.
 
         Crea el directorio de la cuenta si no existe.
 
@@ -224,7 +224,8 @@ class LocalFileStorage(BaseAccountStorage):
             cookies:    Lista de dicts de cookies (formato Playwright).
 
         Returns:
-            Path al archivo de cookies escrito.
+            Locator: ruta absoluta del ``cookies.json`` escrito, para
+            almacenar en ``AccountProfile.cookies_path``.
 
         Raises:
             StorageError: Si no se puede escribir el archivo.
@@ -240,22 +241,18 @@ class LocalFileStorage(BaseAccountStorage):
                 account_id,
                 len(cookies),
             )
-            return cookies_file
+            return str(cookies_file)
         except OSError as exc:
             raise StorageError(
                 f"No se pudieron guardar las cookies de '{account_id}': {exc}"
             ) from exc
 
-    def load_cookies(
+    async def load_cookies(
         self,
         platform: str,
         account_id: str,
     ) -> list[dict[str, Any]] | None:
-        """Lee las cookies de disco.
-
-        Args:
-            platform:   ``"facebook"`` o ``"instagram"``.
-            account_id: UUID4 de la cuenta.
+        """Lee las cookies de disco en formato Playwright.
 
         Returns:
             Lista de dicts de cookies, o ``None`` si el archivo no existe.
@@ -278,6 +275,36 @@ class LocalFileStorage(BaseAccountStorage):
         except (OSError, json.JSONDecodeError) as exc:
             raise StorageError(
                 f"No se pudieron leer las cookies de '{account_id}': {exc}"
+            ) from exc
+
+    async def delete_cookies(
+        self,
+        platform: str,
+        account_id: str,
+    ) -> bool:
+        """Elimina el archivo de cookies de una cuenta.
+
+        Args:
+            platform:   ``"facebook"`` o ``"instagram"``.
+            account_id: UUID4 de la cuenta.
+
+        Returns:
+            ``True`` si el archivo existía y fue eliminado, ``False`` si no.
+        """
+        cookies_file = self._account_dir(platform, account_id) / COOKIES_FILENAME
+        if not cookies_file.exists():
+            return False
+
+        try:
+            cookies_file.unlink()
+            logger.debug(
+                "Cookies eliminadas | account_id=%s",
+                account_id,
+            )
+            return True
+        except OSError as exc:
+            raise StorageError(
+                f"No se pudieron eliminar las cookies de '{account_id}': {exc}"
             ) from exc
 
     # ── Helpers privados ──────────────────────────────────────────────────────

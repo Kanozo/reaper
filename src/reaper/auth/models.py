@@ -42,7 +42,6 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from pathlib import Path
 from typing import Any
 
 
@@ -67,6 +66,13 @@ MAX_RECENT_ERRORS: int = 20
 
 # Plataformas soportadas como valor de AccountProfile.platform.
 SUPPORTED_PLATFORMS: frozenset[str] = frozenset({"facebook", "instagram"})
+
+# Nombre de la cookie que contiene el ID de usuario de cada plataforma.
+# Se usa para localizar una cuenta por su ID de plataforma (c_user / ds_user_id).
+PLATFORM_USER_ID_COOKIE: dict[str, str] = {
+    "facebook": "c_user",
+    "instagram": "ds_user_id",
+}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -311,10 +317,14 @@ class AccountProfile:
 
     @property
     def has_cookies(self) -> bool:
-        """True si la ruta de cookies está configurada y el archivo existe."""
-        if not self.cookies_path:
-            return False
-        return Path(self.cookies_path).exists()
+        """True si la cuenta tiene cookies asociadas.
+
+        Se basa en ``cookies_path`` (locator opaco). Cada backend es
+        responsable de dejar este campo a ``None`` cuando no hay cookies:
+        ``LocalFileStorage`` lo reconstruye según exista ``cookies.json``,
+        y los backends de BD lo guardan como identificador simbólico.
+        """
+        return self.cookies_path is not None
 
     @property
     def is_selectable(self) -> bool:

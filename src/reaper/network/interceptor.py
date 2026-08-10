@@ -24,7 +24,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from playwright.async_api import Page, Request, Route
+from playwright.async_api import Page, Request, Response
 
 logger = get_logger(__name__)
 
@@ -269,49 +269,38 @@ class NetworkInterceptor:
     """
     Intercepta y categoriza el tráfico de red de una página Playwright.
 
-    Usa dos mecanismos complementarios:
+    Usa tres eventos de Playwright coordinados:
 
-    1. **Listener ``request``** (síncrono): captura metadatos de todas las
-       peticiones (URL, método, headers, body de la request, GraphQL meta).
-       No lee el body de la respuesta.
+    1. **``request``** (síncrono): captura metadatos (URL, método, headers,
+       body POST, GraphQL meta). Sin I/O.
 
-    2. **``page.route()``** (async): para las URLs de interés (GraphQL /
-       Instagram API), intercepta la petición, hace ``route.fetch()`` para
-       obtener la respuesta con el body **completamente bufferizado** antes de
-       procesarla, y luego la devuelve al browser sin modificaciones.
+    2. **``response``** (async): captura status y headers. Marca las URLs
+       sin body (1xx, 204, 304) para saltarlas en el siguiente paso.
+       **No intenta leer el body aquí** — en Firefox con gzip/br el body
+       no está disponible cuando llegan los headers.
 
-    Este diseño evita el ``NS_ERROR_FAILURE`` / ``Target closed`` de Firefox
-    que ocurría al llamar a ``response.body()`` desde el evento ``response``
-    (que se dispara cuando llegan los headers, no cuando termina el body).
+    3. **``requestfinished``** (async): se dispara cuando la descarga del
+       body está **completamente** terminada (decompressor incluido).
+       Solo aquí se llama ``response.body()`` — sin riesgo de
+       ``NS_ERROR_FAILURE`` ni necesidad de reintentos.
 
-    La intercepción debe activarse ANTES de ``page.goto()`` para capturar
-    también las peticiones de la carga inicial de la página.
+    No se usa ``page.route()`` ni ``route.fetch()``: hacer una segunda
+    petición HTTP al mismo endpoint causa que Facebook la rechace con
+    ``Timeout 30000ms`` o ``Request context disposed``.
 
-    Categorías de tráfico capturado:
-        - **graphql**: POST a ``/api/graphql/`` (Facebook) o ``graphql/query`` (Instagram).
-        - **api**:     Peticiones a ``/api/v1/`` o ``i.instagram.com/api`` (Instagram REST).
+    La intercepción debe activarse **ANTES de ``page.goto()``** para
+    capturar también las peticiones de la carga inicial de la página.
 
     Uso típico::
 
         interceptor = NetworkInterceptor(debug=True)
-        interceptor.attach(page)          # ANTES de page.goto()
+        await interceptor.attach(page)    # ANTES de page.goto()
         await page.goto(url)
-        # ... scroll opcional ...
         traffic = interceptor.get_traffic()
-        for req in traffic.graphql_requests:
-            print(req.graphql_meta.friendly_name)
-
-    Monitorización para infinity-scroll::
-
-        baseline = interceptor.snapshot_activity()
-        await page.mouse.wheel(0, 1000)
-        await asyncio.sleep(1.5)
-        new_events = interceptor.new_activity_since(baseline)
-        # Si new_events == 0 repetidamente → no hay más contenido
 
     Attributes:
         debug:                 Si True, emite logs de cada request/response.
-        response_body_timeout: Segundos máximos para ``route.fetch()``.
+        response_body_timeout: Segundos máximos para ``response.body()``.
     """
 
     #: Patrones que identifican endpoints GraphQL.
@@ -348,134 +337,132 @@ class NetworkInterceptor:
         # Contador global de eventos para monitorización de actividad (infinity-scroll).
         self._activity_count: int = 0
 
+        # URLs cuyo status no lleva body (1xx, 204, 304) — para saltarlas
+        # en requestfinished sin intentar request.response().body().
+        self._skip_urls: set[str] = set()
+
     # ------------------------------------------------------------------
     # API pública
     # ------------------------------------------------------------------
 
     async def attach(self, page: Page) -> None:
         """
-        Registra los listeners ``request`` y las routes en la página.
-
-        ``page.route()`` en la API async de Playwright es una coroutine y
-        debe ser awaited. Por eso ``attach`` es async.
-
-        Estrategia de captura de bodies:
-            Para las URLs de interés (GraphQL / Instagram API) se registra un
-            **``page.route()``** que intercepta cada petición, hace
-            ``await route.fetch()`` para obtener la respuesta con el body
-            completamente bufferizado, y la devuelve al browser sin cambios.
-            Esto elimina la race condition de ``response.body()`` en Firefox
-            (NS_ERROR_FAILURE / Target closed).
-
-        Debe llamarse **ANTES de ``page.goto()``** para no perder las peticiones
-        que se disparan durante la carga inicial.
+        Registra los listeners de red en la página.
 
         Args:
             page: Instancia de página de Playwright activa (no navegada aún).
         """
-        # Listener síncrono de request: captura metadatos de TODAS las peticiones.
-        # page.on() sigue siendo síncrono.
         page.on("request", self._on_request)
-
-        # page.route() es async en la API async de Playwright → await obligatorio.
-        for pattern in self._route_patterns():
-            await page.route(pattern, self._on_route)
+        page.on("response", self._on_response_headers)
+        page.on("requestfinished", self._on_request_finished)
 
         if self.debug:
             logger.debug("NetworkInterceptor adjunto a la página.")
+            logger.debug("Listeners registrados: request, response, requestfinished")
 
-    def _route_patterns(self) -> list[str]:
+    async def _on_response_headers(self, response: Response) -> None:
         """
-        Genera los patrones glob de Playwright para registrar routes.
+        Captura status y headers cuando llegan (sin leer body).
 
-        Playwright route() acepta strings con ``*`` y ``**``:
-            - ``**/api/graphql/**`` captura Facebook GraphQL.
-            - ``**/api/graphql``    captura sin trailing slash.
-
-        Returns:
-            Lista de patrones glob para cubrir todos los endpoints de interés.
-        """
-        return [
-            "**/api/graphql",
-            "**/api/graphql/**",
-            "**/graphql/query",
-            "**/graphql/query/**",
-            "**/api/v1/**",
-            "**/i.instagram.com/api/**",
-        ]
-
-    async def _on_route(self, route: Route) -> None:
-        """
-        Route handler que captura requests + responses con body garantizado.
-
-        Llama a ``route.fetch()`` para obtener la respuesta del servidor con
-        el body completamente bufferizado antes de procesarla. Esto evita el
-        problema de NS_ERROR_FAILURE / Target closed de Firefox que ocurre
-        cuando se intenta leer ``response.body()`` desde el evento ``response``
-        (que se dispara cuando llegan los headers, no cuando termina el body).
-
-        Flujo:
-            1. ``route.fetch()`` → realiza la petición y espera el body completo.
-            2. Leer y parsear el body de ``api_response``.
-            3. ``route.fulfill()`` → devolver la respuesta al browser sin
-               modificaciones, para que la página funcione con normalidad.
-
-        El ``CapturedRequest`` ya fue creado por ``_on_request`` (listener
-        síncrono que se dispara antes). Este método solo crea el
-        ``CapturedResponse`` correspondiente.
+        El body aún no está disponible en Firefox en este momento.
+        Solo descarta respuestas sin body (1xx, 204, 304) para no
+        intentar leerlas en ``_on_request_finished``.
 
         Args:
-            route: Objeto Route de Playwright.
+            response: Objeto Response de Playwright (headers disponibles).
         """
-        request = route.request
-        url = request.url
-        category = self._categorize(url)
+        url = response.url
+        if self.debug and "facebook.com" in url:
+            logger.debug("🔍 EVENTO RESPONSE disparado: %s (status=%d)", url[:80], response.status)
 
+        if self._categorize(url) is None:
+            return
+        # Guardar en un set los URLs cuyo status no lleva body,
+        # para saltarlos en requestfinished sin intentar leer nada.
+        if response.status in self._NO_BODY_STATUS_CODES:
+            self._skip_urls.add(url)
+
+    async def _on_request_finished(self, request: Request) -> None:
+        """
+        Captura el body completo una vez que la descarga terminó.
+
+        ``requestfinished`` se dispara cuando Firefox/Chromium han recibido
+        y decomprimido el body completo — garantiza que ``response.body()``
+        tendrá éxito sin ``NS_ERROR_FAILURE``.
+
+        Flujo:
+            1. Verificar que la URL es de interés y no está en skip list.
+            2. ``await request.response()`` para obtener la Response.
+            3. Verificar Content-Type.
+            4. ``await response.body()`` — seguro porque el body está completo.
+            5. Parsear y almacenar el ``CapturedResponse``.
+
+        Args:
+            request: Objeto Request de Playwright (petición completada).
+        """
+        url = request.url
+
+        if self.debug and "facebook.com" in url:
+            logger.debug("🔍 EVENTO REQUESTFINISHED disparado: %s", url[:80])
+
+        category = self._categorize(url)
         if category is None:
-            # URL no relevante que llegó al route handler (no debería ocurrir
-            # con los patrones actuales, pero manejarlo por seguridad)
-            await route.continue_()
+            return
+
+        if url in self._skip_urls:
+            self._skip_urls.discard(url)
             return
 
         body: list[dict[str, Any]] | dict[str, Any] | None = None
         body_raw: str | None = None
-        status = 200
+        status = 0
         response_headers: dict[str, str] = {}
 
         try:
+            # request.response() puede retornar None si la request fue abortada
+            response = await request.response()
+            if response is None:
+                return
+
+            status = response.status
+            response_headers = dict(response.headers)
+
+            if status in self._NO_BODY_STATUS_CODES:
+                return
+
+            content_type = response_headers.get("content-type", "")
+            should_read = (
+                "json" in content_type
+                or "javascript" in content_type
+                or category in ("graphql", "api")
+            )
+            if not should_read:
+                return
+
+            # Body completamente disponible — sin necesidad de reintentos
             async with asyncio.timeout(self.response_body_timeout):
-                api_response = await route.fetch()
+                raw_bytes = await response.body()
 
-            status = api_response.status
-            response_headers = dict(api_response.headers)
-
-            # Sólo leer body si el status puede tenerlo
-            if status not in self._NO_BODY_STATUS_CODES:
-                raw_bytes = await api_response.body()
-                if raw_bytes:
-                    body_raw = raw_bytes.decode("utf-8", errors="replace")
-                    body = self._parse_response_body(body_raw)
-
-            # Devolver la respuesta al browser sin modificar
-            await route.fulfill(response=api_response)
+            if raw_bytes:
+                body_raw = raw_bytes.decode("utf-8", errors="replace")
+                body = self._parse_response_body(body_raw)
 
         except asyncio.TimeoutError:
-            logger.debug("Timeout en route.fetch() para: %s", url[:60])
-            await route.continue_()
-            return
+            logger.debug("Timeout leyendo body en requestfinished: %s", url[:60])
+
         except Exception as exc:
             err_str = str(exc)
-            # "Target closed" ocurre si el browser se cierra mientras
-            # esperamos el fetch — es esperado al cerrar la sesión
-            if "Target closed" in err_str or "closed" in err_str.lower():
-                logger.debug("Route abortado (target cerrado): %s", url[:60])
+            # Errores esperados al cerrar el browser
+            if any(kw in err_str for kw in (
+                "Target closed",
+                "Request context disposed",
+                "context was destroyed",
+            )):
+                logger.debug("Body no disponible (contexto cerrado): %s", url[:60])
             else:
-                logger.debug("Error en route handler (%s): %s", url[:60], exc)
-            # Intentar continuar normalmente para no romper la navegación
-            try:
-                await route.continue_()
-            except Exception:
-                pass
+                logger.debug(
+                    "Error en requestfinished (%s): %s", url[:60], err_str[:100]
+                )
             return
 
         captured = CapturedResponse(
@@ -492,7 +479,9 @@ class NetworkInterceptor:
         self._activity_count += 1
 
         if self.debug:
-            body_label = f" [body: {len(body_raw)}chars]" if body_raw else " [sin body]"
+            body_label = (
+                f" [body: {len(body_raw)}chars]" if body_raw else " [sin body]"
+            )
             logger.debug(
                 "↓ [%s] %d %s%s",
                 category.upper(),
@@ -590,6 +579,10 @@ class NetworkInterceptor:
             request: Objeto Request de Playwright.
         """
         url = request.url
+
+        if self.debug and "facebook.com" in url:
+            logger.debug("🔍 EVENTO REQUEST disparado: %s", url[:80])
+
         category = self._categorize(url)
         if category is None:
             return

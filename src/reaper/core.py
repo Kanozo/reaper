@@ -85,6 +85,7 @@ class Reaper:
         proxy_server: str | None = None,
         proxy_username: str | None = None,
         proxy_password: str | None = None,
+        account: str | None = None,
     ) -> dict[str, Any]:
         """Extrae datos de una URL de Facebook o Instagram.
 
@@ -98,9 +99,15 @@ class Reaper:
             proxy_server:   URL del proxy, p.ej. ``"http://ip:8080"``.
             proxy_username: Usuario del proxy.
             proxy_password: Contraseña del proxy.
+            account:        Identificador de la cuenta a forzar en esta sesión:
+                            ``account_id`` (UUID4), ``username`` o ID de usuario
+                            de la plataforma (``c_user``/``ds_user_id``).
+                            ``None`` = rotación automática. Requiere que el
+                            ``Reaper`` se haya construido con ``account_manager``.
 
         Returns:
             ``dict[str, Any]`` con los datos scrapeados.
+            Siempre incluye: ``url``, ``platform``, ``status``.
 
         Raises:
             ValueError:              URL vacía o esquema inválido.
@@ -123,6 +130,7 @@ class Reaper:
             proxy_username=proxy_username,
             proxy_password=proxy_password,
             account_manager=self._account_manager,  # None en modo anónimo
+            preferred_account=account,
         )
 
         auth_mode = (

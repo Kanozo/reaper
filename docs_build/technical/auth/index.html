@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con soporte de cuentas autenticadas">
+        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con cuentas autenticadas, almacenamiento configurable (local/PostgreSQL/MongoDB) y anti-detección integrada">
       
       
         <meta name="author" content="Reaper Contributors">
@@ -500,6 +500,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Almacenamiento (local/PG/Mongo)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user/login/" class="md-nav__link">
         
   
@@ -909,6 +937,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#deteccion-de-contenido-no-disponible" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detección de contenido no disponible
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Detección de contenido no disponible">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#el-problema-falso-positivo-en-error_route" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        El problema: falso positivo en error_route
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#senales-especificas-de-content_unavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Señales específicas de content_unavailable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementacion-capa-1b-en-requires_auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementación: capa 1b en requires_auth()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#comportamiento-en-facebookscraperrun" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comportamiento en FacebookScraper.run()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nuevo-status-en-el-resultado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nuevo status en el resultado
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#refresco-automatico-de-cookies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1160,6 +1260,34 @@
     
   
     Extender Reaper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../anti_scraping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Anti-Detección (anti_detection)
   
 
     
@@ -1580,6 +1708,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#deteccion-de-contenido-no-disponible" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Detección de contenido no disponible
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Detección de contenido no disponible">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#el-problema-falso-positivo-en-error_route" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        El problema: falso positivo en error_route
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#senales-especificas-de-content_unavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Señales específicas de content_unavailable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementacion-capa-1b-en-requires_auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementación: capa 1b en requires_auth()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#comportamiento-en-facebookscraperrun" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comportamiento en FacebookScraper.run()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nuevo-status-en-el-resultado" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nuevo status en el resultado
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#refresco-automatico-de-cookies" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1900,6 +2100,92 @@ completa está en <a href="../../api/auth/#accountmanager">api/auth.md</a>.</p>
 <code>update_activity()</code> se llama en cada petición (alta frecuencia) y los
 backends de BD pueden implementarla como un <code>UPDATE</code> parcial.
 <code>save()</code> es para cambios de estado completos, que ocurren raramente.</p>
+<h2 id="deteccion-de-contenido-no-disponible">Detección de contenido no disponible<a class="headerlink" href="#deteccion-de-contenido-no-disponible" title="Permanent link">&para;</a></h2>
+<h3 id="el-problema-falso-positivo-en-error_route">El problema: falso positivo en <code>error_route</code><a class="headerlink" href="#el-problema-falso-positivo-en-error_route" title="Permanent link">&para;</a></h3>
+<p>Cuando Facebook no puede servir un contenido (eliminado, privado, restringido),
+renderiza una página de error con <code>"tracePolicy":"comet.error"</code> en los bloques
+JSON de bootstrap. Esta señal es la misma que emite cuando el usuario necesita
+autenticarse para ver contenido restringido.</p>
+<p>Sin distinción entre ambos casos, el scraper reintentaba con cuentas del pool
+ante cualquier <code>error_route</code> — un reintento costoso e inútil cuando el contenido
+simplemente no existe para nadie.</p>
+<h3 id="senales-especificas-de-content_unavailable">Señales específicas de <code>content_unavailable</code><a class="headerlink" href="#senales-especificas-de-content_unavailable" title="Permanent link">&para;</a></h3>
+<p>Facebook incluye en los props del <code>rootView</code> un mensaje de error específico
+que solo aparece en páginas de contenido no disponible, no en muros de login:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">&quot;rootView&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">&quot;props&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;This content isn&#39;t available right now&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">&quot;body&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;When this happens, it&#39;s usually because the owner only shared it with\n        a small group of people, changed who can see it or it&#39;s been deleted.&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">&quot;privacy&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">}</span>
+</code></pre></div>
+<p>El muro de login genuino nunca incluye este <code>title</code> — muestra el formulario
+de credenciales directamente o redirige a <code>/login</code>.</p>
+<h3 id="implementacion-capa-1b-en-requires_auth">Implementación: capa 1b en <code>requires_auth()</code><a class="headerlink" href="#implementacion-capa-1b-en-requires_auth" title="Permanent link">&para;</a></h3>
+<p>La detección se inserta entre la comprobación de contenido presente (capa 1)
+y la comprobación de URL redirigida (capa 2):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>requires_auth(html, url)
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    │
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    ├─ Capa 1:  ¿tracePolicy de contenido real?      → False (no bloqueado)
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    │
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    ├─ Capa 1b: ¿título/cuerpo de error específico?  → False, auth_type=&quot;content_unavailable&quot;
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    │               (contenido eliminado/restringido)
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    │
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    ├─ Capa 2:  ¿URL redirigida a /login?            → True, auth_type=&quot;login_redirect&quot;
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    │
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    ├─ Capa 3:  ¿tracePolicy=comet.error / CometErrorRoute?  → True, auth_type=&quot;error_route&quot;
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    │
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    └─ Capa 4:  ¿CometErrorRoot + privacy=true?      → True, auth_type=&quot;privacy_wall&quot;
+</code></pre></div>
+<p><code>requires_auth=False</code> para <code>content_unavailable</code> es intencionado: el contenido
+existe pero no es accesible. No es un muro que se pueda superar autenticándose.</p>
+<h3 id="comportamiento-en-facebookscraperrun">Comportamiento en <code>FacebookScraper.run()</code><a class="headerlink" href="#comportamiento-en-facebookscraperrun" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">auth</span> <span class="o">=</span> <span class="n">requires_auth</span><span class="p">(</span><span class="n">fetch_result</span><span class="o">.</span><span class="n">html_content</span><span class="p">,</span> <span class="n">final_url</span><span class="p">)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">if</span> <span class="n">auth</span><span class="o">.</span><span class="n">auth_type</span> <span class="o">==</span> <span class="s2">&quot;content_unavailable&quot;</span><span class="p">:</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="c1"># Retorno inmediato — sin tocar el pool de cuentas</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_content_unavailable_result</span><span class="p">(</span><span class="n">final_url</span><span class="p">)</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="k">if</span> <span class="n">auth</span><span class="o">.</span><span class="n">requires_auth</span><span class="p">:</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="c1"># Flujo de reintento normal (autenticación/cookies)</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="o">...</span>
+</code></pre></div>
+<h3 id="nuevo-status-en-el-resultado">Nuevo <code>status</code> en el resultado<a class="headerlink" href="#nuevo-status-en-el-resultado" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="p">{</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="s2">&quot;platform&quot;</span><span class="p">:</span>           <span class="s2">&quot;facebook&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="s2">&quot;status&quot;</span><span class="p">:</span>             <span class="s2">&quot;content_unavailable&quot;</span><span class="p">,</span>   <span class="c1"># ← distinguible de &quot;error&quot;</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="s2">&quot;error&quot;</span><span class="p">:</span>              <span class="s2">&quot;Content not available — deleted or restricted&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="s2">&quot;raw_data_available&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="s2">&quot;final_url&quot;</span><span class="p">:</span>          <span class="s2">&quot;https://www.facebook.com/story.php?...&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="s2">&quot;scraped_at&quot;</span><span class="p">:</span>         <span class="n">datetime</span><span class="p">(</span><span class="o">...</span><span class="p">),</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th><code>status</code></th>
+<th>Significado</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"ok"</code></td>
+<td>Extracción exitosa con datos</td>
+</tr>
+<tr>
+<td><code>"error"</code></td>
+<td>Fallo técnico o muro de auth no recuperable</td>
+</tr>
+<tr>
+<td><code>"content_unavailable"</code></td>
+<td>Contenido eliminado o inaccesible para todos</td>
+</tr>
+</tbody>
+</table>
+<hr />
 <h2 id="refresco-automatico-de-cookies">Refresco automático de cookies<a class="headerlink" href="#refresco-automatico-de-cookies" title="Permanent link">&para;</a></h2>
 <h3 id="como-funciona">Cómo funciona<a class="headerlink" href="#como-funciona" title="Permanent link">&para;</a></h3>
 <p>Después de cada navegación autenticada exitosa, el servidor de Facebook o
@@ -1911,24 +2197,24 @@ finalizar <code>page.goto()</code>, <code>context.cookies()</code> ya devuelve l
 actualizadas que el servidor emitió. <code>ContentFetcher.fetch()</code> lee este
 estado post-navegación y lo expone en <code>FetchResult.updated_cookies</code>.</p>
 <h3 id="flujo-de-auto-refresh-en-basescraper_fetch_with_account">Flujo de auto-refresh en <code>BaseScraper._fetch_with_account()</code><a class="headerlink" href="#flujo-de-auto-refresh-en-basescraper_fetch_with_account" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>fetch con cookies_originales
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    → Playwright navega la URL
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    → servidor responde con Set-Cookie actualizados
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    → context.cookies() → updated_cookies
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>_cookies_differ(cookies_originales, updated_cookies)?
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    ├─ NO → nada que hacer, las cookies no cambiaron
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    └─ SÍ → manager.import_cookies(account_id, updated_cookies)
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>                ├─ sobreescribe cookies.json en disco
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>                ├─ status → ACTIVE (si estaba NEEDS_REFRESH)
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>                └─ requests_since_cookie_refresh → 0
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>fetch con cookies_originales
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    → Playwright navega la URL
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    → servidor responde con Set-Cookie actualizados
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    → context.cookies() → updated_cookies
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>_cookies_differ(cookies_originales, updated_cookies)?
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    ├─ NO → nada que hacer, las cookies no cambiaron
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    └─ SÍ → manager.import_cookies(account_id, updated_cookies)
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>                ├─ sobreescribe cookies.json en disco
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>                ├─ status → ACTIVE (si estaba NEEDS_REFRESH)
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>                └─ requests_since_cookie_refresh → 0
 </code></pre></div>
 <h3 id="_cookies_differ-que-se-compara"><code>_cookies_differ()</code> — qué se compara<a class="headerlink" href="#_cookies_differ-que-se-compara" title="Permanent link">&para;</a></h3>
 <p>Solo se comparan los campos que afectan a la validez de la sesión:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span> <span class="nf">_cookies_differ</span><span class="p">(</span><span class="n">original</span><span class="p">,</span> <span class="n">updated</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">original_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">c</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]:</span> <span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">),</span> <span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;expires&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">original</span><span class="p">}</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">updated_map</span>  <span class="o">=</span> <span class="p">{</span><span class="n">c</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]:</span> <span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">),</span> <span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;expires&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">updated</span><span class="p">}</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="k">return</span> <span class="n">original_map</span> <span class="o">!=</span> <span class="n">updated_map</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">def</span> <span class="nf">_cookies_differ</span><span class="p">(</span><span class="n">original</span><span class="p">,</span> <span class="n">updated</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">original_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">c</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]:</span> <span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">),</span> <span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;expires&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">original</span><span class="p">}</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">updated_map</span>  <span class="o">=</span> <span class="p">{</span><span class="n">c</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]:</span> <span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">),</span> <span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;expires&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">updated</span><span class="p">}</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="k">return</span> <span class="n">original_map</span> <span class="o">!=</span> <span class="n">updated_map</span>
 </code></pre></div>
 <p>Se ignoran <code>httpOnly</code>, <code>sameSite</code>, <code>path</code> y otros campos de metadatos que
 no afectan a la autenticación. Dos casos considerados como cambio:</p>
@@ -1985,37 +2271,37 @@ el navegador de forma normal.</p>
 <li>El navegador se cierra con <code>browser.close()</code>.</li>
 </ol>
 <h3 id="patrones-de-url-detectados">Patrones de URL detectados<a class="headerlink" href="#patrones-de-url-detectados" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">SUCCESS_URL_PATTERNS</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="s2">&quot;facebook&quot;</span><span class="p">:</span> <span class="p">[</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>        <span class="s2">&quot;facebook.com/?&quot;</span><span class="p">,</span> <span class="s2">&quot;facebook.com/home&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>        <span class="s2">&quot;facebook.com/me&quot;</span><span class="p">,</span> <span class="s2">&quot;facebook.com/feed&quot;</span><span class="p">,</span> <span class="s2">&quot;facebook.com/?sk=h_chr&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="p">],</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="s2">&quot;instagram&quot;</span><span class="p">:</span> <span class="p">[</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="s2">&quot;instagram.com/?&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="s2">&quot;instagram.com/accounts/onetap&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>        <span class="s2">&quot;instagram.com/accounts/login/two_factor&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="p">],</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">SUCCESS_URL_PATTERNS</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="s2">&quot;facebook&quot;</span><span class="p">:</span> <span class="p">[</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>        <span class="s2">&quot;facebook.com/?&quot;</span><span class="p">,</span> <span class="s2">&quot;facebook.com/home&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>        <span class="s2">&quot;facebook.com/me&quot;</span><span class="p">,</span> <span class="s2">&quot;facebook.com/feed&quot;</span><span class="p">,</span> <span class="s2">&quot;facebook.com/?sk=h_chr&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="p">],</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="s2">&quot;instagram&quot;</span><span class="p">:</span> <span class="p">[</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>        <span class="s2">&quot;instagram.com/?&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>        <span class="s2">&quot;instagram.com/accounts/onetap&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>        <span class="s2">&quot;instagram.com/accounts/login/two_factor&quot;</span><span class="p">,</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    <span class="p">],</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="inyeccion-de-cookies-en-playwright">Inyección de cookies en Playwright<a class="headerlink" href="#inyeccion-de-cookies-en-playwright" title="Permanent link">&para;</a></h3>
 <p>Las cookies capturadas tienen el formato exacto que acepta <code>context.add_cookies()</code>
 en <code>ContentFetcher.fetch()</code>. La inyección ocurre <strong>antes</strong> de <code>page.goto()</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">if</span> <span class="n">cookies</span><span class="p">:</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="k">await</span> <span class="n">context</span><span class="o">.</span><span class="n">add_cookies</span><span class="p">(</span><span class="n">cookies</span><span class="p">)</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="c1"># Scope: contexto (no página) → aplica a todos los dominios</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="c1"># y persiste entre navegaciones dentro de la misma sesión.</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">if</span> <span class="n">cookies</span><span class="p">:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="k">await</span> <span class="n">context</span><span class="o">.</span><span class="n">add_cookies</span><span class="p">(</span><span class="n">cookies</span><span class="p">)</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>    <span class="c1"># Scope: contexto (no página) → aplica a todos los dominios</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="c1"># y persiste entre navegaciones dentro de la misma sesión.</span>
 </code></pre></div>
 <h2 id="sistema-de-almacenamiento">Sistema de almacenamiento<a class="headerlink" href="#sistema-de-almacenamiento" title="Permanent link">&para;</a></h2>
 <h3 id="estructura-en-disco">Estructura en disco<a class="headerlink" href="#estructura-en-disco" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>data/accounts/
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>├── facebook/
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>│   └── {account_id}/
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>│       ├── account.json    ← perfil (sin cookies_path)
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>│       └── cookies.json    ← cookies en formato Playwright
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>└── instagram/
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    └── {account_id}/
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>        ├── account.json
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>        └── cookies.json
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>data/accounts/
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>├── facebook/
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>│   └── {account_id}/
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>│       ├── account.json    ← perfil (sin cookies_path)
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>│       └── cookies.json    ← cookies en formato Playwright
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>└── instagram/
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>    └── {account_id}/
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>        ├── account.json
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>        └── cookies.json
 </code></pre></div>
 <p>El campo <code>cookies_path</code> no se persiste en <code>account.json</code>.
 <code>LocalFileStorage._load_from_file()</code> lo infiere comprobando si existe
@@ -2023,35 +2309,35 @@ en <code>ContentFetcher.fetch()</code>. La inyección ocurre <strong>antes</stro
 <h3 id="migracion-a-base-de-datos">Migración a base de datos<a class="headerlink" href="#migracion-a-base-de-datos" title="Permanent link">&para;</a></h3>
 <p>Implementa los cinco métodos abstractos de <code>BaseAccountStorage</code>
 (documentados en <a href="../../api/auth/#reaper.auth.storage.base.BaseAccountStorage">api/auth.md</a>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span> <span class="nn">reaper.auth.storage.base</span> <span class="kn">import</span> <span class="n">BaseAccountStorage</span><span class="p">,</span> <span class="n">StorageError</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="kn">from</span> <span class="nn">reaper.auth.models</span> <span class="kn">import</span> <span class="n">AccountActivity</span><span class="p">,</span> <span class="n">AccountProfile</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">class</span> <span class="nc">PostgresAccountStorage</span><span class="p">(</span><span class="n">BaseAccountStorage</span><span class="p">):</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">account</span><span class="p">:</span> <span class="n">AccountProfile</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>        <span class="c1"># upsert — INSERT ... ON CONFLICT DO UPDATE</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>        <span class="o">...</span>
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">account_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AccountProfile</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>        <span class="c1"># SELECT WHERE account_id = ?</span>
-<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>        <span class="o">...</span>
-<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>
-<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">account_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>        <span class="c1"># DELETE WHERE account_id = ?</span>
-<a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>        <span class="o">...</span>
-<a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>
-<a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">list_all</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">platform</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">AccountProfile</span><span class="p">]:</span>
-<a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>        <span class="c1"># SELECT con WHERE platform opcional</span>
-<a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>        <span class="o">...</span>
-<a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a>
-<a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">update_activity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">account_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">activity</span><span class="p">:</span> <span class="n">AccountActivity</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a>        <span class="c1"># UPDATE parcial — solo el campo activity</span>
-<a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a>        <span class="o">...</span>
-<a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a>
-<a id="__codelineno-7-26" name="__codelineno-7-26" href="#__codelineno-7-26"></a><span class="n">manager</span> <span class="o">=</span> <span class="n">AccountManager</span><span class="p">(</span>
-<a id="__codelineno-7-27" name="__codelineno-7-27" href="#__codelineno-7-27"></a>    <span class="n">storage</span><span class="o">=</span><span class="n">PostgresAccountStorage</span><span class="p">(</span><span class="n">session</span><span class="p">),</span>
-<a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a>    <span class="n">accounts_dir</span><span class="o">=</span><span class="s2">&quot;data/accounts&quot;</span><span class="p">,</span>   <span class="c1"># sigue necesario para cookies en disco</span>
-<a id="__codelineno-7-29" name="__codelineno-7-29" href="#__codelineno-7-29"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">from</span> <span class="nn">reaper.auth.storage.base</span> <span class="kn">import</span> <span class="n">BaseAccountStorage</span><span class="p">,</span> <span class="n">StorageError</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kn">from</span> <span class="nn">reaper.auth.models</span> <span class="kn">import</span> <span class="n">AccountActivity</span><span class="p">,</span> <span class="n">AccountProfile</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="k">class</span> <span class="nc">PostgresAccountStorage</span><span class="p">(</span><span class="n">BaseAccountStorage</span><span class="p">):</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">account</span><span class="p">:</span> <span class="n">AccountProfile</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>        <span class="c1"># upsert — INSERT ... ON CONFLICT DO UPDATE</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>        <span class="o">...</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">account_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AccountProfile</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>        <span class="c1"># SELECT WHERE account_id = ?</span>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>        <span class="o">...</span>
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">account_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>        <span class="c1"># DELETE WHERE account_id = ?</span>
+<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a>        <span class="o">...</span>
+<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>
+<a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">list_all</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">platform</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">AccountProfile</span><span class="p">]:</span>
+<a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a>        <span class="c1"># SELECT con WHERE platform opcional</span>
+<a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a>        <span class="o">...</span>
+<a id="__codelineno-11-21" name="__codelineno-11-21" href="#__codelineno-11-21"></a>
+<a id="__codelineno-11-22" name="__codelineno-11-22" href="#__codelineno-11-22"></a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">update_activity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">account_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">activity</span><span class="p">:</span> <span class="n">AccountActivity</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-11-23" name="__codelineno-11-23" href="#__codelineno-11-23"></a>        <span class="c1"># UPDATE parcial — solo el campo activity</span>
+<a id="__codelineno-11-24" name="__codelineno-11-24" href="#__codelineno-11-24"></a>        <span class="o">...</span>
+<a id="__codelineno-11-25" name="__codelineno-11-25" href="#__codelineno-11-25"></a>
+<a id="__codelineno-11-26" name="__codelineno-11-26" href="#__codelineno-11-26"></a><span class="n">manager</span> <span class="o">=</span> <span class="n">AccountManager</span><span class="p">(</span>
+<a id="__codelineno-11-27" name="__codelineno-11-27" href="#__codelineno-11-27"></a>    <span class="n">storage</span><span class="o">=</span><span class="n">PostgresAccountStorage</span><span class="p">(</span><span class="n">session</span><span class="p">),</span>
+<a id="__codelineno-11-28" name="__codelineno-11-28" href="#__codelineno-11-28"></a>    <span class="n">accounts_dir</span><span class="o">=</span><span class="s2">&quot;data/accounts&quot;</span><span class="p">,</span>   <span class="c1"># sigue necesario para cookies en disco</span>
+<a id="__codelineno-11-29" name="__codelineno-11-29" href="#__codelineno-11-29"></a><span class="p">)</span>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Cookies siempre en disco</p>
@@ -2061,13 +2347,13 @@ se almacenan en disco local. <code>AccountManager</code> instancia siempre un
 </div>
 <h2 id="serializacion-de-modelos">Serialización de modelos<a class="headerlink" href="#serializacion-de-modelos" title="Permanent link">&para;</a></h2>
 <p>Todos los modelos son 100% serializables sin <code>default=str</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Serializar</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="n">data</span> <span class="o">=</span> <span class="n">profile</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>        <span class="c1"># dict con solo tipos primitivos</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>                <span class="c1"># sin kwargs adicionales</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="c1"># Deserializar — tolerante a versiones anteriores del schema</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="n">profile</span> <span class="o">=</span> <span class="n">AccountProfile</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="n">activity</span> <span class="o">=</span> <span class="n">AccountActivity</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;activity&quot;</span><span class="p">])</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Serializar</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">data</span> <span class="o">=</span> <span class="n">profile</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>        <span class="c1"># dict con solo tipos primitivos</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>                <span class="c1"># sin kwargs adicionales</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># Deserializar — tolerante a versiones anteriores del schema</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="n">profile</span> <span class="o">=</span> <span class="n">AccountProfile</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="n">activity</span> <span class="o">=</span> <span class="n">AccountActivity</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">&quot;activity&quot;</span><span class="p">])</span>
 </code></pre></div>
 
 

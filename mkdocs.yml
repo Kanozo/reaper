@@ -1,5 +1,5 @@
 site_name: Reaper
-site_description: Librería Python para scraping de Facebook e Instagram con soporte de cuentas autenticadas
+site_description: Librería Python para scraping de Facebook e Instagram con cuentas autenticadas, almacenamiento configurable (local/PostgreSQL/MongoDB) y anti-detección integrada
 site_author: Reaper Contributors
 docs_dir: docs
 site_dir: docs_build
@@ -61,6 +61,7 @@ nav:
     - Instalación: user/installation.md
     - Scraping sin cuentas: user/anonymous.md
     - Cuentas autenticadas: user/accounts.md
+    - Almacenamiento (local/PG/Mongo): user/storage.md
     - Login interactivo: user/login.md
     - Gestión del pool: user/pool.md
     - Proxies: user/proxy.md
@@ -74,6 +75,7 @@ nav:
     - Parsers: technical/parsers.md
     - Resultados por tipo: technical/results.md
     - Extender Reaper: technical/extending.md
+    - Anti-Detección (anti_detection): anti_scraping.md
 
   - API Reference:
     - reaper (público): api/public.md

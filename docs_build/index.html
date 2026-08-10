@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con soporte de cuentas autenticadas">
+        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con cuentas autenticadas, almacenamiento configurable (local/PostgreSQL/MongoDB) y anti-detección integrada">
       
       
         <meta name="author" content="Reaper Contributors">
@@ -611,6 +611,34 @@
   
   
     <li class="md-nav__item">
+      <a href="user/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Almacenamiento (local/PG/Mongo)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="user/login/" class="md-nav__link">
         
   
@@ -960,6 +988,34 @@
     
   
     Extender Reaper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="anti_scraping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Anti-Detección (anti_detection)
   
 
     
@@ -1376,7 +1432,7 @@
 <h1 id="reaper">Reaper<a class="headerlink" href="#reaper" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p>Librería Python para extraer datos estructurados de <strong>Facebook</strong> e <strong>Instagram</strong>.
-Versión <strong>0.2.0</strong> — Python 3.11+</p>
+Versión <strong>0.2.3</strong> — Python 3.11+</p>
 </blockquote>
 <hr />
 <p>Reaper convierte URLs de redes sociales en diccionarios Python listos para procesar.
@@ -1422,6 +1478,7 @@ con rotación inteligente de cuentas.</p>
 <li>Extraer posts, reels, vídeos, fotos, grupos y perfiles de Facebook.</li>
 <li>Extraer posts y reels de Instagram.</li>
 <li>Gestionar múltiples cuentas autenticadas con rotación inteligente.</li>
+<li>Almacenar cuentas y sesiones en local, PostgreSQL o MongoDB vía <code>reaper.toml</code>.</li>
 <li>Trabajar con proxies para anonimidad o distribución geográfica.</li>
 <li>Guardar artefactos de debug (HTML, tráfico GraphQL) para diagnóstico offline.</li>
 <li>Serializar el resultado como JSON con un solo parámetro (<code>default=str</code>).</li>
@@ -1444,11 +1501,12 @@ con rotación inteligente de cuentas.</p>
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>│   ├── account_manager.py  Gestor central de cuentas
 <a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>│   ├── rotator.py       Algoritmo de rotación por score
 <a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>│   ├── login.py         Flujo interactivo de login
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>│   └── storage/         Backends de persistencia
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>├── network/             Playwright + captura de tráfico
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>├── scrapers/            Orquestadores por plataforma
-<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>├── parsers/             Extracción de datos del HTML/GraphQL
-<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>└── utils/               Utilidades compartidas
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>│   └── storage/         Backends de persistencia (local/PG/Mongo)
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>├── network/             Playwright + captura de tráfico (ContentFetcher)
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>├── anti_detection/      Fingerprint, stealth JS y comportamiento humano
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>├── scrapers/            Orquestadores por plataforma
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>├── parsers/             Extracción de datos del HTML/GraphQL
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>└── utils/               Utilidades compartidas
 </code></pre></div>
 
 

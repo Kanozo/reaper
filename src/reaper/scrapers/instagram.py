@@ -107,11 +107,24 @@ class InstagramScraper(BaseScraper):
                 debug=self.config.debug,
             )
         else:
-            # Fallback: intentar post, luego reel (como antes)
-            logger.warning("Tipo desconocido, intentando IgPostParser como fallback")
-            result = IgPostParser(...).parse()
-            if result.get("error"):
-                result = IgReelParser(...).parse()
+            # Fallback: ante un tipo de contenido desconocido, intentamos
+            # con los parsers más probables (post → reel).
+            logger.warning(
+                "Tipo de contenido desconocido, intentando parsers de "
+                "fallback | content_type=%s | url=%s",
+                content_type,
+                final_url,
+            )
+            for parser_cls in (IgPostParser, IgReelParser):
+                fallback_parser = parser_cls(
+                    html_content=fetch_result.html_content,
+                    final_url=final_url,
+                    original_url=self.config.url,
+                    debug=self.config.debug,
+                )
+                result = fallback_parser.parse()
+                if not result.get("error"):
+                    return result
             return result
 
         result = parser.parse()

@@ -1,12 +1,11 @@
-from datetime import datetime
-from reaper.utils.logger import get_logger
 import re
+from datetime import datetime
 from typing import Any
 
 from reaper.network.interceptor import CapturedTraffic
 from reaper.parsers.facebook.facebook_parser import FacebookContentParser
-
-from reaper.utils import srt_to_dict, get_text_from_url, SocialMediaParser
+from reaper.utils import SocialMediaParser
+from reaper.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -206,7 +205,10 @@ class VideoParser(FacebookContentParser):
 
         found = self._node_technical is not None or self._node_story is not None
         if not found:
-            logger.debug("No se encontraron nodos de vídeo en los %d bloques JSON.", len(self._blocks))
+            logger.debug(
+                "No se encontraron nodos de vídeo en los %d bloques JSON.",
+                len(self._blocks),
+            )
         return found
 
     # ==================================================================
@@ -539,17 +541,11 @@ class VideoParser(FacebookContentParser):
         # URLs de reproducción
         vdlf = self._safe_get(self._node_technical, "videoDeliveryLegacyFields") or {}
 
-        captions_locales = self._safe_get(
+        captions = self._process_captions_locales(
+            self._safe_get(
                 self._node_technical, "video_available_captions_locales", default=[]
             )
-
-        captions = []
-        for caption_item in captions_locales:
-            if caption_item.get("locale") in {"en_US", "es_ES"} or caption_item.get("localized_language") in {"English", "Español"}:
-                caption_item["captions_url"] = srt_to_dict(
-                    get_text_from_url(caption_item.get("captions_url"))
-                )
-                captions.append(caption_item)
+        )
 
         self.result["video"] = {
             "id": self._safe_get(self._node_technical, "id", default=self._video_id),
@@ -563,7 +559,7 @@ class VideoParser(FacebookContentParser):
 
             # Captions/subtítulos
             "captions": captions,
-            
+
             # Flags técnicos
             "is_looping": self.result.get("is_looping", False),
             "is_spherical": self.result.get("is_spherical", False)
@@ -672,7 +668,11 @@ class VideoParser(FacebookContentParser):
         self.result["reaction_count"] = reaction_count_raw
         self.result["reactions"] = []
         self.result["comments_count"] = 0
-        logger.debug("OG fallback: play_count=%d, reaction_count=%d", play_count_raw, reaction_count_raw)
+        logger.debug(
+            "OG fallback: play_count=%d, reaction_count=%d",
+            play_count_raw,
+            reaction_count_raw,
+        )
 
 
     # ==================================================================
@@ -744,7 +744,9 @@ class VideoParser(FacebookContentParser):
             "video_thumbnail_overlays_renderer", "video", "playable_duration_in_ms",
         )
         social_metrics = SocialMediaParser()
-        comments_count = social_metrics._parse_metric(feedback.get("comment_count_reduced", 0), "comment_count_reduced")
+        comments_count = social_metrics._parse_metric(
+            feedback.get("comment_count_reduced", 0), "comment_count_reduced"
+        )
 
         return {
             "__typename": "feed_facebook_video",

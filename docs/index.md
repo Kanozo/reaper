@@ -1,7 +1,7 @@
 # Reaper
 
 > Librería Python para extraer datos estructurados de **Facebook** e **Instagram**.
-> Versión **0.2.0** — Python 3.11+
+> Versión **0.2.3** — Python 3.11+
 
 ---
 
@@ -58,6 +58,7 @@ asyncio.run(main())
 - Extraer posts, reels, vídeos, fotos, grupos y perfiles de Facebook.
 - Extraer posts y reels de Instagram.
 - Gestionar múltiples cuentas autenticadas con rotación inteligente.
+- Almacenar cuentas y sesiones en local, PostgreSQL o MongoDB vía `reaper.toml`.
 - Trabajar con proxies para anonimidad o distribución geográfica.
 - Guardar artefactos de debug (HTML, tráfico GraphQL) para diagnóstico offline.
 - Serializar el resultado como JSON con un solo parámetro (`default=str`).
@@ -82,8 +83,9 @@ src/reaper/
 │   ├── account_manager.py  Gestor central de cuentas
 │   ├── rotator.py       Algoritmo de rotación por score
 │   ├── login.py         Flujo interactivo de login
-│   └── storage/         Backends de persistencia
-├── network/             Playwright + captura de tráfico
+│   └── storage/         Backends de persistencia (local/PG/Mongo)
+├── network/             Playwright + captura de tráfico (ContentFetcher)
+├── anti_detection/      Fingerprint, stealth JS y comportamiento humano
 ├── scrapers/            Orquestadores por plataforma
 ├── parsers/             Extracción de datos del HTML/GraphQL
 └── utils/               Utilidades compartidas

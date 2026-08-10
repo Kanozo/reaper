@@ -37,6 +37,7 @@ Diseño de las operaciones atómicas:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from reaper.auth.models import AccountActivity, AccountProfile
 
@@ -49,10 +50,32 @@ class BaseAccountStorage(ABC):
     (SQLAlchemy async, Motor para MongoDB, etc.).
 
     Implementaciones concretas:
-        - ``LocalFileStorage``   — JSON en disco (incluida en la librería)
-        - ``SqlAlchemyStorage``  — (ejemplo de extensión futura)
-        - ``MongoStorage``       — (ejemplo de extensión futura)
+        - ``LocalFileStorage``  — JSON en disco (default, incluida en la librería)
+        - ``PostgresStorage``   — PostgreSQL 15+ vía ``asyncpg``
+        - ``MongoStorage``      — MongoDB vía ``motor``
+
+    Cada backend persiste tanto el perfil como las cookies de sesión, por lo
+    que el ``AccountManager`` puede operar de forma idéntica sin importar el
+    backend seleccionado (disco o base de datos).
     """
+
+    # ── Ciclo de vida ─────────────────────────────────────────────────────────
+    # No-ops por defecto: backends sin recursos que liberar no necesitan
+    # sobrescribirlos. Los que gestionan pools de conexión los implementan.
+
+    async def connect(self) -> None:
+        """Inicializa conexiones/pools si el backend lo requiere.
+
+        Por defecto no hace nada. ``PostgresStorage`` crea aquí su pool.
+        """
+        return None
+
+    async def close(self) -> None:
+        """Libera los recursos (pools, clientes) del backend.
+
+        Por defecto no hace nada.
+        """
+        return None
 
     # ── Operaciones de perfil completo ────────────────────────────────────────
 
@@ -150,6 +173,73 @@ class BaseAccountStorage(ABC):
 
         Raises:
             StorageError: Si hay un error durante la actualización.
+        """
+        ...
+
+    # ── Operaciones de cookies (persistencia según el backend) ──────────────
+
+    @abstractmethod
+    async def save_cookies(
+        self,
+        platform: str,
+        account_id: str,
+        cookies: list[dict[str, Any]],
+    ) -> str:
+        """Persiste las cookies de sesión de una cuenta en el backend.
+
+        Args:
+            platform:   ``"facebook"`` o ``"instagram"``.
+            account_id: UUID4 de la cuenta.
+            cookies:    Lista de dicts de cookies en formato Playwright.
+
+        Returns:
+            Locator (string opaco) que el llamante guarda en
+            ``AccountProfile.cookies_path``. En ``LocalFileStorage`` es la
+            ruta del ``cookies.json``; en los backends de BD, un identificador
+            simbólico.
+
+        Raises:
+            StorageError: Si no se puede persistir.
+        """
+        ...
+
+    @abstractmethod
+    async def load_cookies(
+        self,
+        platform: str,
+        account_id: str,
+    ) -> list[dict[str, Any]] | None:
+        """Lee las cookies de sesión de una cuenta desde el backend.
+
+        Args:
+            platform:   ``"facebook"`` o ``"instagram"``.
+            account_id: UUID4 de la cuenta.
+
+        Returns:
+            Lista de dicts de cookies, o ``None`` si no existen.
+
+        Raises:
+            StorageError: Si existe cookies pero no se pueden leer.
+        """
+        ...
+
+    @abstractmethod
+    async def delete_cookies(
+        self,
+        platform: str,
+        account_id: str,
+    ) -> bool:
+        """Elimina las cookies de sesión de una cuenta.
+
+        Args:
+            platform:   ``"facebook"`` o ``"instagram"``.
+            account_id: UUID4 de la cuenta.
+
+        Returns:
+            ``True`` si existían y se eliminaron, ``False`` si no existían.
+
+        Raises:
+            StorageError: Si hay un error durante la eliminación.
         """
         ...
 

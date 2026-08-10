@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.2.4
+
+### Nuevas funcionalidades
+
+- **Almacenamiento configurable** (`reaper.auth.storage`):
+  - Dos backends de base de datos además del local en JSON:
+    `PostgresStorage` (asyncpg) y `MongoStorage` (motor).
+  - Fichero de configuración `reaper.toml` con precedencia:
+    ruta explícita → `REAPER_CONFIG` → `./reaper.toml` →
+    `~/.config/reaper/reaper.toml` → `/etc/reaper/reaper.toml`.
+  - `load_storage_config()`, `find_config_file()` y `build_storage()` para
+    construir el backend indicado sin instanciarlo manualmente.
+  - La elección de backend es **todo o nada**: perfiles y cookies viven en el
+    mismo backend; no hay mezcla local/BD.
+  - `AccountManager()` respeta automáticamente la configuración del fichero y
+    expone `save_cookies()`, `load_cookies()` y `delete_cookies()` con
+    implementación por backend.
+
+- **Selección explícita de cuenta**:
+  - `AccountManager.resolve_account()` localiza una cuenta por `account_id`
+    (UUID4), `username` o ID de usuario de la plataforma (`c_user` / `ds_user_id`).
+  - `get_account_for_request(preferred=...)` permite fijar la cuenta para una
+    petición sin desactivar el rotador.
+  - `scrape(account=...)`, `Reaper.scrape(account=...)` y la CLI
+    `reaper <url> --account <username>` propagan la preferencia.
+  - Resolución de ID de usuario solo para valores numéricos de 5+ dígitos,
+    evitando colisiones con usernames cortos.
+
+### API modificada
+
+- `AccountManager` añade `resolve_account()`, `save_cookies()`,
+  `load_cookies()`, `delete_cookies()`.
+- `scrape()` y `Reaper.scrape()` añaden el parámetro opcional `account`.
+- `ScraperConfig` añade `preferred_account`.
+- CLI: nuevo flag `--account`.
+
+### Compatibilidad
+
+Todos los cambios son **compatibles hacia atrás**. Sin `reaper.toml` el
+comportamiento es idéntico a 0.2.3 (backend `local` por defecto).
+
+---
+
 ## 0.2.3
 
 ### Nuevas funcionalidades

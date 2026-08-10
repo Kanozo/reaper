@@ -155,7 +155,13 @@ class BaseScraper(ABC):
             return await self._fetch(override_url=override_url)
 
         # ── Selección de cuenta ───────────────────────────────────────────────
-        account = await manager.get_account_for_request(platform)
+        # Si config.preferred_account está definido, se fuerza esa cuenta
+        # (por account_id, username o ID de usuario de la plataforma);
+        # si no, el AccountManager aplica la rotación normal.
+        account = await manager.get_account_for_request(
+            platform,
+            preferred=self.config.preferred_account,
+        )
 
         if account is None:
             self.logger.warning(
@@ -166,9 +172,7 @@ class BaseScraper(ABC):
             return await self._fetch(override_url=override_url)
 
         # ── Cargar cookies de disco ───────────────────────────────────────────
-        original_cookies = manager._local_storage.load_cookies(
-            platform, account.account_id
-        )
+        original_cookies = await manager.load_cookies(platform, account.account_id)
 
         if not original_cookies:
             self.logger.warning(

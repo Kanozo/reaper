@@ -1,0 +1,59 @@
+# ==============================================================================
+# reaper.toml — Configuración de Reaper (leída con tomllib, stdlib 3.11+)
+# ==============================================================================
+# Este fichero es OPCIONAL. Si no existe, Reaper usa LocalFileStorage en
+# "data/accounts" (comportamiento original).
+#
+# Búsqueda del fichero (primer hallazgo gana):
+#   1. Ruta explícita  ->  AccountManager(storage=...) o build_storage(path)
+#   2. $REAPER_CONFIG  ->  variable de entorno con la ruta
+#   3. ./reaper.toml   ->  directorio de trabajo actual
+#   4. ~/.config/reaper/reaper.toml
+#   5. /etc/reaper/reaper.toml
+#
+# El backend elegido en [storage] decide dónde viven TODOS los datos de la
+# cuenta (perfil, actividad y cookies de sesión):
+#   local    ->  archivos JSON en accounts_dir (sin BD)
+#   postgres ->  PostgreSQL vía asyncpg (requiere `pip install "reaper[db]"`)
+#   mongodb  ->  MongoDB vía motor     (requiere `pip install "reaper[db]"`)
+# ==============================================================================
+
+[storage]
+backend = "local"              # local | postgres | mongodb
+accounts_dir = "data/accounts" # solo se usa con backend="local"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Backend PostgreSQL — descomenta para activar:
+#
+# [storage]
+# backend = "postgres"
+#
+# [storage.postgres]
+# dsn = "postgresql://usuario:clave@localhost:5432/reaper"
+# pool_size = 5       # conexiones del pool
+# max_overflow = 10   # conexiones extra bajo carga
+# timeout = 30.0      # segundos de espera de conexión
+# table = "accounts"  # nombre de la tabla (se crea sola al conectar)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Backend MongoDB — descomenta para activar:
+#
+# [storage]
+# backend = "mongodb"
+#
+# [storage.mongodb]
+# uri = "mongodb://localhost:27017"
+# database = "reaper"
+# collection = "accounts"
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ==============================================================================
+# NOTAS DE SEGURIDAD
+# ------------------------------------------------------------------------------
+# - Las cookies de sesión contienen tokens de autenticación. En los backends
+#   de BD se guardan como JSONB/BSON sin cifrar: protege el acceso a la BD
+#   (red, credenciales) y evita commitear este fichero si contiene secretos.
+# - Da permiso 0600 al fichero si incluye credenciales:
+#     chmod 600 reaper.toml
+# ==============================================================================

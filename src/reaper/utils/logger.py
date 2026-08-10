@@ -10,7 +10,7 @@ Responsabilidades:
     - Ofrecer ``get_logger`` como alias documentado de ``getLogger(__name__)``
       para que los módulos del proyecto lo importen de un solo lugar.
     - Exponer ``DebugContext``: context manager que activa temporalmente
-      el nivel DEBUG en el logger ``"reaper"`` y deshabilita la propagación,
+      el nivel DEBUG en el logger ``"reaper"`` (o un sub-logger concreto),
       útil para tests o sesiones de depuración puntuales.
 
 Uso típico

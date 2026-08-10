@@ -6,15 +6,15 @@
 
 ## Índice
 
-1. [¿Por qué existe este módulo?](#1-por-qué-existe-este-módulo)
-2. [Cómo detectan los sitios web a los bots](#2-cómo-detectan-los-sitios-web-a-los-bots)
-3. [Arquitectura del módulo](#3-arquitectura-del-módulo)
-4. [Capa 1 — Fingerprint de navegador](#4-capa-1--fingerprint-de-navegador)
-5. [Capa 2 — Scripts de evasión JavaScript](#5-capa-2--scripts-de-evasión-javascript)
-6. [Capa 3 — Comportamiento humano](#6-capa-3--comportamiento-humano)
-7. [Integración en ContentFetcher](#7-integración-en-contentfetcher)
-8. [Justificación de todos los valores de timing](#8-justificación-de-todos-los-valores-de-timing)
-9. [Configuración y casos de uso](#9-configuración-y-casos-de-uso)
+1. [¿Por qué existe este módulo?](#1-por-que-existe-este-modulo)
+2. [Cómo detectan los sitios web a los bots](#2-como-detectan-los-sitios-web-a-los-bots)
+3. [Arquitectura del módulo](#3-arquitectura-del-modulo)
+4. [Capa 1 — Fingerprint de navegador](#4-capa-1-fingerprint-de-navegador)
+5. [Capa 2 — Scripts de evasión JavaScript](#5-capa-2-scripts-de-evasion-javascript)
+6. [Capa 3 — Comportamiento humano](#6-capa-3-comportamiento-humano)
+7. [Integración en ContentFetcher](#7-integracion-en-contentfetcher)
+8. [Justificación de todos los valores de timing](#8-justificacion-de-todos-los-valores-de-timing)
+9. [Configuración y casos de uso](#9-configuracion-y-casos-de-uso)
 10. [Glosario](#10-glosario)
 
 ---
@@ -511,7 +511,7 @@ Para una sesión con `auto_scroll` y 8 iteraciones el ahorro es de aproximadamen
 ### 9.1 Uso estándar (anti-detección activa, por defecto)
 
 ```python
-fetcher = ContentFetcher("https://www.facebook.com/reel/XXXXXX")
+fetcher = ContentFetcher("https://www.facebook.com/reel/816043001524221")
 result = await fetcher.fetch(auto_scroll=True)
 ```
 

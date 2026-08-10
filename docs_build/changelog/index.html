@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con soporte de cuentas autenticadas">
+        <meta name="description" content="Librería Python para scraping de Facebook e Instagram con cuentas autenticadas, almacenamiento configurable (local/PostgreSQL/MongoDB) y anti-detección integrada">
       
       
         <meta name="author" content="Reaper Contributors">
@@ -498,6 +498,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../user/storage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Almacenamiento (local/PG/Mongo)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../user/login/" class="md-nav__link">
         
   
@@ -860,6 +888,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../anti_scraping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Anti-Detección (anti_detection)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1191,6 +1247,134 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#024" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.4
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.4">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nuevas-funcionalidades" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nuevas funcionalidades
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-modificada" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API modificada
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compatibilidad" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compatibilidad
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#023" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.3
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.3">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nuevas-funcionalidades_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nuevas funcionalidades
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archivos-modificados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archivos modificados
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#022" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.2
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nuevas-funcionalidades_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nuevas funcionalidades
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archivos-modificados_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archivos modificados
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#021" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1203,7 +1387,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#nuevas-funcionalidades" class="md-nav__link">
+  <a href="#nuevas-funcionalidades_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Nuevas funcionalidades
@@ -1225,7 +1409,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#archivos-modificados" class="md-nav__link">
+  <a href="#archivos-modificados_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Archivos modificados
@@ -1253,7 +1437,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#nuevas-funcionalidades_1" class="md-nav__link">
+  <a href="#nuevas-funcionalidades_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Nuevas funcionalidades
@@ -1264,7 +1448,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#api-modificada" class="md-nav__link">
+  <a href="#api-modificada_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         API modificada
@@ -1275,7 +1459,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#compatibilidad" class="md-nav__link">
+  <a href="#compatibilidad_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Compatibilidad
@@ -1336,6 +1520,134 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#024" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.4
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.4">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nuevas-funcionalidades" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nuevas funcionalidades
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-modificada" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API modificada
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#compatibilidad" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compatibilidad
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#023" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.3
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.3">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nuevas-funcionalidades_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nuevas funcionalidades
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archivos-modificados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archivos modificados
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#022" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.2
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.2">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#nuevas-funcionalidades_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Nuevas funcionalidades
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archivos-modificados_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Archivos modificados
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#021" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1348,7 +1660,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#nuevas-funcionalidades" class="md-nav__link">
+  <a href="#nuevas-funcionalidades_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Nuevas funcionalidades
@@ -1370,7 +1682,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#archivos-modificados" class="md-nav__link">
+  <a href="#archivos-modificados_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Archivos modificados
@@ -1398,7 +1710,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#nuevas-funcionalidades_1" class="md-nav__link">
+  <a href="#nuevas-funcionalidades_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Nuevas funcionalidades
@@ -1409,7 +1721,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#api-modificada" class="md-nav__link">
+  <a href="#api-modificada_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         API modificada
@@ -1420,7 +1732,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#compatibilidad" class="md-nav__link">
+  <a href="#compatibilidad_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Compatibilidad
@@ -1464,8 +1776,122 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
-<h2 id="021">0.2.1<a class="headerlink" href="#021" title="Permanent link">&para;</a></h2>
+<h2 id="024">0.2.4<a class="headerlink" href="#024" title="Permanent link">&para;</a></h2>
 <h3 id="nuevas-funcionalidades">Nuevas funcionalidades<a class="headerlink" href="#nuevas-funcionalidades" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Almacenamiento configurable</strong> (<code>reaper.auth.storage</code>):</li>
+<li>Dos backends de base de datos además del local en JSON:
+    <code>PostgresStorage</code> (asyncpg) y <code>MongoStorage</code> (motor).</li>
+<li>Fichero de configuración <code>reaper.toml</code> con precedencia:
+    ruta explícita → <code>REAPER_CONFIG</code> → <code>./reaper.toml</code> →
+    <code>~/.config/reaper/reaper.toml</code> → <code>/etc/reaper/reaper.toml</code>.</li>
+<li><code>load_storage_config()</code>, <code>find_config_file()</code> y <code>build_storage()</code> para
+    construir el backend indicado sin instanciarlo manualmente.</li>
+<li>La elección de backend es <strong>todo o nada</strong>: perfiles y cookies viven en el
+    mismo backend; no hay mezcla local/BD.</li>
+<li>
+<p><code>AccountManager()</code> respeta automáticamente la configuración del fichero y
+    expone <code>save_cookies()</code>, <code>load_cookies()</code> y <code>delete_cookies()</code> con
+    implementación por backend.</p>
+</li>
+<li>
+<p><strong>Selección explícita de cuenta</strong>:</p>
+</li>
+<li><code>AccountManager.resolve_account()</code> localiza una cuenta por <code>account_id</code>
+    (UUID4), <code>username</code> o ID de usuario de la plataforma (<code>c_user</code> / <code>ds_user_id</code>).</li>
+<li><code>get_account_for_request(preferred=...)</code> permite fijar la cuenta para una
+    petición sin desactivar el rotador.</li>
+<li><code>scrape(account=...)</code>, <code>Reaper.scrape(account=...)</code> y la CLI
+    <code>reaper &lt;url&gt; --account &lt;username&gt;</code> propagan la preferencia.</li>
+<li>Resolución de ID de usuario solo para valores numéricos de 5+ dígitos,
+    evitando colisiones con usernames cortos.</li>
+</ul>
+<h3 id="api-modificada">API modificada<a class="headerlink" href="#api-modificada" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>AccountManager</code> añade <code>resolve_account()</code>, <code>save_cookies()</code>,
+  <code>load_cookies()</code>, <code>delete_cookies()</code>.</li>
+<li><code>scrape()</code> y <code>Reaper.scrape()</code> añaden el parámetro opcional <code>account</code>.</li>
+<li><code>ScraperConfig</code> añade <code>preferred_account</code>.</li>
+<li>CLI: nuevo flag <code>--account</code>.</li>
+</ul>
+<h3 id="compatibilidad">Compatibilidad<a class="headerlink" href="#compatibilidad" title="Permanent link">&para;</a></h3>
+<p>Todos los cambios son <strong>compatibles hacia atrás</strong>. Sin <code>reaper.toml</code> el
+comportamiento es idéntico a 0.2.3 (backend <code>local</code> por defecto).</p>
+<hr />
+<h2 id="023">0.2.3<a class="headerlink" href="#023" title="Permanent link">&para;</a></h2>
+<h3 id="nuevas-funcionalidades_1">Nuevas funcionalidades<a class="headerlink" href="#nuevas-funcionalidades_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Detección de contenido no disponible</strong> en <code>FacebookScraper</code> y <code>fb_auth_detector</code>:</li>
+</ul>
+<p>Hasta esta versión, las páginas de Facebook donde el contenido ha sido eliminado
+  o restringido permanentemente eran detectadas como muros de autenticación
+  (<code>auth_type="error_route"</code>), provocando reintentos inútiles con cuentas del pool.
+  Autenticarse no resuelve este caso porque el contenido no existe para nadie.</p>
+<p>La detección ahora distingue ambos casos antes de evaluar si hay muro de login:</p>
+<ul>
+<li>
+<p><strong><code>content_unavailable</code></strong> — nuevo <code>auth_type</code>. Facebook muestra este estado
+    cuando el contenido fue eliminado, era privado para un grupo reducido, o el
+    propietario cambió la privacidad. Señales detectadas en el bloque JSON de
+    bootstrap del HTML renderizado:</p>
+<ul>
+<li>Título <code>"This content isn't available right now"</code> en los props del <code>rootView</code>.</li>
+<li>Texto del cuerpo del error con referencias a "deleted" o "small group".</li>
+</ul>
+</li>
+<li>
+<p><strong>Sin reintento</strong>: cuando se detecta <code>content_unavailable</code>, <code>FacebookScraper</code>
+    retorna inmediatamente con <code>status="content_unavailable"</code> sin consultar al
+    <code>AccountManager</code> ni consumir cuentas del pool.</p>
+</li>
+<li>
+<p><strong>Nuevo <code>status</code> en el resultado</strong>: <code>"content_unavailable"</code> permite que el caller
+  distinga este caso de un error técnico (<code>"error"</code>) o de un muro de autenticación
+  no recuperable, y tome decisiones informadas (e.g. marcar el contenido como
+  eliminado en su sistema).</p>
+</li>
+<li>
+<p><strong>Nuevo método <code>FacebookScraper._content_unavailable_result()</code></strong>: helper análogo
+  a <code>_error_result()</code> que emite el dict con <code>status="content_unavailable"</code> y
+  <code>error="Content not available — deleted or restricted"</code>.</p>
+</li>
+</ul>
+<h3 id="archivos-modificados">Archivos modificados<a class="headerlink" href="#archivos-modificados" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>src/reaper/utils/fb_auth_detector.py</code> — constante <code>_CONTENT_UNAVAILABLE</code> + capa 1b en <code>requires_auth()</code></li>
+<li><code>src/reaper/scrapers/facebook.py</code> — guardia <code>content_unavailable</code> en <code>run()</code> + método <code>_content_unavailable_result()</code></li>
+</ul>
+<hr />
+<h2 id="022">0.2.2<a class="headerlink" href="#022" title="Permanent link">&para;</a></h2>
+<h3 id="nuevas-funcionalidades_2">Nuevas funcionalidades<a class="headerlink" href="#nuevas-funcionalidades_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Reintento automático al detectar muro de autenticación</strong> en <code>FacebookScraper</code> e <code>InstagramScraper</code>:</li>
+</ul>
+<p>Cuando <code>requires_auth()</code> detecta un muro de login en el HTML, el scraper
+  ya no devuelve error inmediatamente. En su lugar aplica esta lógica:</p>
+<ul>
+<li><strong>Fetch anónimo + muro</strong>: si hay <code>AccountManager</code> con cuentas disponibles,
+    reintenta automáticamente con una cuenta autenticada.</li>
+<li><strong>Fetch autenticado + muro</strong>: las cookies de la cuenta activa han sido
+    invalidadas por la plataforma. La cuenta se marca como <code>COOKIE_EXPIRED</code>
+    y se reintenta con una cuenta diferente del pool.</li>
+<li>
+<p><strong>Sin posibilidad de retry</strong> (sin manager, sin cuentas, o segundo muro):
+    retorna error. Máximo 1 reintento por petición.</p>
+</li>
+<li>
+<p><code>InstagramScraper</code> añade detección de muro de autenticación via <code>requires_auth()</code>
+  (no existía en versiones anteriores).</p>
+</li>
+</ul>
+<h3 id="archivos-modificados_1">Archivos modificados<a class="headerlink" href="#archivos-modificados_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>src/reaper/scrapers/facebook.py</code> — métodos <code>_handle_auth_wall()</code>, <code>_retry_with_account()</code></li>
+<li><code>src/reaper/scrapers/instagram.py</code> — mismos métodos + import de <code>requires_auth</code></li>
+</ul>
+<hr />
+<h2 id="021">0.2.1<a class="headerlink" href="#021" title="Permanent link">&para;</a></h2>
+<h3 id="nuevas-funcionalidades_3">Nuevas funcionalidades<a class="headerlink" href="#nuevas-funcionalidades_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Refresco automático de cookies</strong> sin intervención manual:</li>
 <li><code>FetchResult</code> añade el campo <code>updated_cookies</code>: cookies leídas del
@@ -1485,7 +1911,7 @@ activo, <code>requests_since_cookie_refresh</code> se resetea a 0 después de ca
 petición donde el servidor devuelva cookies actualizadas. El WARNING
 <code>NEEDS_REFRESH</code> solo aparece si el servidor no emite <code>Set-Cookie</code> durante
 N peticiones consecutivas — caso inusual que requiere intervención manual.</p>
-<h3 id="archivos-modificados">Archivos modificados<a class="headerlink" href="#archivos-modificados" title="Permanent link">&para;</a></h3>
+<h3 id="archivos-modificados_2">Archivos modificados<a class="headerlink" href="#archivos-modificados_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>src/reaper/network/interceptor.py</code> — campo <code>updated_cookies</code> en <code>FetchResult</code></li>
 <li><code>src/reaper/network/content_fetcher.py</code> — captura de cookies post-navegación</li>
@@ -1495,7 +1921,7 @@ N peticiones consecutivas — caso inusual que requiere intervención manual.</p
 </ul>
 <hr />
 <h2 id="020">0.2.0<a class="headerlink" href="#020" title="Permanent link">&para;</a></h2>
-<h3 id="nuevas-funcionalidades_1">Nuevas funcionalidades<a class="headerlink" href="#nuevas-funcionalidades_1" title="Permanent link">&para;</a></h3>
+<h3 id="nuevas-funcionalidades_4">Nuevas funcionalidades<a class="headerlink" href="#nuevas-funcionalidades_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Sistema de cuentas autenticadas</strong> (<code>reaper.auth</code>):</li>
 <li><code>AccountManager</code> — gestor central de cuentas con CRUD completo.</li>
@@ -1532,7 +1958,7 @@ N peticiones consecutivas — caso inusual que requiere intervención manual.</p
 </li>
 <li>Inyección en el contexto del navegador antes de navegar.</li>
 </ul>
-<h3 id="api-modificada">API modificada<a class="headerlink" href="#api-modificada" title="Permanent link">&para;</a></h3>
+<h3 id="api-modificada_1">API modificada<a class="headerlink" href="#api-modificada_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>scrape()</code> acepta el parámetro opcional <code>account_manager</code>.</li>
 <li><code>Reaper.__init__</code> acepta el parámetro opcional <code>account_manager</code>.</li>
@@ -1540,7 +1966,7 @@ N peticiones consecutivas — caso inusual que requiere intervención manual.</p
 <li><code>BaseScraper._fetch()</code> ahora es abstracto y acepta parámetro <code>cookies</code>.</li>
 <li><code>ContentFetcher.fetch()</code> acepta parámetro <code>cookies: list[dict] | None</code>.</li>
 </ul>
-<h3 id="compatibilidad">Compatibilidad<a class="headerlink" href="#compatibilidad" title="Permanent link">&para;</a></h3>
+<h3 id="compatibilidad_1">Compatibilidad<a class="headerlink" href="#compatibilidad_1" title="Permanent link">&para;</a></h3>
 <p>Todos los cambios son <strong>compatibles hacia atrás</strong>. El código existente que no
 usa <code>account_manager</code> funciona sin modificaciones.</p>
 <hr />

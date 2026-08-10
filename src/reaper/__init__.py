@@ -62,12 +62,21 @@ from reaper.core import Reaper, ScrapingError, UnsupportedPlatformError
 from reaper.auth import AccountManager
 from reaper.auth.models import AccountActivity, AccountProfile, AccountStatus
 from reaper.auth.storage.base import BaseAccountStorage, StorageError
+from reaper.auth.storage.config import (
+    StorageConfig,
+    MongoConfig,
+    PostgresConfig,
+    build_storage,
+    load_storage_config,
+)
 from reaper.auth.storage.local import LocalFileStorage
+from reaper.auth.storage.mongodb import MongoStorage
+from reaper.auth.storage.postgres import PostgresStorage
 
 if TYPE_CHECKING:
     pass
 
-__version__ = "0.2.0"
+__version__ = "0.2.3"
 
 __all__ = [
     # Función de conveniencia y clase principal
@@ -85,7 +94,15 @@ __all__ = [
     # Storage (para extensión con BD propia)
     "BaseAccountStorage",
     "LocalFileStorage",
+    "PostgresStorage",
+    "MongoStorage",
     "StorageError",
+    # Configuración de storage
+    "StorageConfig",
+    "PostgresConfig",
+    "MongoConfig",
+    "build_storage",
+    "load_storage_config",
 ]
 
 
@@ -101,6 +118,7 @@ async def scrape(
     proxy_server: str | None = None,
     proxy_username: str | None = None,
     proxy_password: str | None = None,
+    account: str | None = None,
 ) -> dict[str, Any]:
     """Scrape una URL y devuelve los datos extraídos como diccionario.
 
@@ -123,6 +141,9 @@ async def scrape(
         proxy_server:    URL del proxy, p.ej. ``"http://ip:8080"``.
         proxy_username:  Usuario del proxy.
         proxy_password:  Contraseña del proxy.
+        account:         Cuenta a forzar en esta sesión (account_id, username
+                         o ID de usuario de la plataforma). Requiere
+                         ``account_manager``. ``None`` = rotación automática.
 
     Returns:
         ``dict[str, Any]`` con los datos scrapeados.
@@ -145,6 +166,13 @@ async def scrape(
             "https://www.facebook.com/reel/123",
             account_manager=manager,
         )
+
+        # Forzar una cuenta concreta por username
+        result = await scrape(
+            "https://www.facebook.com/reel/123",
+            account_manager=manager,
+            account="mi_usuario@gmail.com",
+        )
     """
     return await Reaper(account_manager=account_manager).scrape(
         url,
@@ -156,4 +184,5 @@ async def scrape(
         proxy_server=proxy_server,
         proxy_username=proxy_username,
         proxy_password=proxy_password,
+        account=account,
     )

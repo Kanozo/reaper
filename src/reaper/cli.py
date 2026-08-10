@@ -151,6 +151,17 @@ ejemplos:
         help="Número de espacios de indentación del JSON. Defecto: 2.",
     )
 
+    # ── Opciones de cuenta ────────────────────────────────────────────────────
+    account_group = parser.add_argument_group("opciones de cuenta")
+    account_group.add_argument(
+        "--account",
+        metavar="IDENTIFICADOR",
+        default=None,
+        help="Forzar una cuenta concreta: account_id (UUID), username o ID de "
+             "usuario de la plataforma (c_user/ds_user_id). Requiere "
+             "account_manager configurado; si no, se ignora y se usa modo anónimo.",
+    )
+
     # ── Opciones generales ────────────────────────────────────────────────────
     parser.add_argument(
         "--debug",
@@ -223,10 +234,18 @@ def main() -> None:
         use_color=None,   # autodetecta TTY
     )
 
-    # Ejecutar el scrape asíncrono desde el contexto síncrono de la CLI
+    # Ejecutar el scrape asíncrono desde el contexto síncrono de la CLI.
+    # Si se indica --account, se construye un AccountManager (respeta el
+    # backend de reaper.toml) para poder resolver la cuenta solicitada.
+    account_manager = None
+    if args.account is not None:
+        from reaper.auth import AccountManager
+
+        account_manager = AccountManager()
+
     try:
         result = asyncio.run(
-            Reaper().scrape(
+            Reaper(account_manager=account_manager).scrape(
                 args.url,
                 headless=args.headless,
                 debug=args.debug,
@@ -236,6 +255,7 @@ def main() -> None:
                 proxy_server=args.proxy_server,
                 proxy_username=args.proxy_username,
                 proxy_password=args.proxy_password,
+                account=args.account,
             )
         )
     except ValueError as exc:

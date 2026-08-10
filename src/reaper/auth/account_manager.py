@@ -4,11 +4,16 @@ reaper/auth/account_manager.py
 Gestor de cuentas autenticadas: CRUD, rotación y ciclo de vida de cookies.
 
 ``AccountManager`` es el único punto de entrada que el resto de la librería
-(scrapers, CLI) necesita para trabajar con cuentas. Coordina tres subsistemas:
+(scrapers, CLI) necesita para trabajar con cuentas. Coordina dos subsistemas:
 
-- ``BaseAccountStorage``  — persistencia de perfiles y actividad.
+- ``BaseAccountStorage``  — persistencia de perfiles, actividad y cookies
+  (LocalFileStorage en disco, PostgresStorage o MongoStorage según config).
 - ``AccountRotator``      — selección inteligente de la cuenta a usar.
-- ``LocalFileStorage``    — gestión física de archivos de cookies.
+
+Backend de almacenamiento:
+    El backend se selecciona inyectándolo con ``storage=...`` o mediante el
+    fichero de configuración ``reaper.toml`` (sección ``[storage]``). Sin
+    fichero ni inyección, se usa ``LocalFileStorage`` en ``data/accounts``.
 
 Flujo de una petición con cuentas::
 
@@ -56,7 +61,7 @@ Ejemplo de uso básico::
 from __future__ import annotations
 
 import json
-import logging
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -64,13 +69,14 @@ from reaper.auth.models import (
     AccountActivity,
     AccountProfile,
     AccountStatus,
+    PLATFORM_USER_ID_COOKIE,
     SUPPORTED_PLATFORMS,
 )
 from reaper.auth.rotator import AccountRotator
 from reaper.auth.storage.base import BaseAccountStorage, StorageError
-from reaper.auth.storage.local import LocalFileStorage
+from reaper.utils.logger import get_logger
 
-logger = logging.getLogger("reaper.auth.account_manager")
+logger = get_logger(__name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constantes
@@ -114,15 +120,20 @@ class AccountManager:
         accounts_dir: str | Path = "data/accounts",
         cookie_refresh_threshold: int = DEFAULT_COOKIE_REFRESH_THRESHOLD,
     ) -> None:
-        # Si no se inyecta storage, usar LocalFileStorage por defecto.
+        # Si no se inyecta storage, usar el backend definido en el fichero
+        # de configuración (default: LocalFileStorage en "data/accounts").
         if storage is None:
-            self._local_storage = LocalFileStorage(accounts_dir)
-            self._storage: BaseAccountStorage = self._local_storage
+            from reaper.auth.storage.config import build_storage, find_config_file
+            from reaper.auth.storage.local import LocalFileStorage
+
+            if find_config_file() is None and accounts_dir != "data/accounts":
+                # Compatibilidad hacia atrás: sin fichero de configuración y
+                # con accounts_dir explícito, se usa LocalFileStorage con esa ruta.
+                self._storage: BaseAccountStorage = LocalFileStorage(accounts_dir)
+            else:
+                self._storage = build_storage()
         else:
             self._storage = storage
-            # Para storage no-local, se necesita LocalFileStorage solo
-            # para la gestión física de cookies en disco.
-            self._local_storage = LocalFileStorage(accounts_dir)
 
         self._rotator = AccountRotator(
             cookie_refresh_threshold=cookie_refresh_threshold
@@ -346,13 +357,13 @@ class AccountManager:
             )
             return False
 
-        # Guardar cookies en disco.
-        cookies_file = self._local_storage.save_cookies(
+        # Guardar cookies en el backend activo (disco o BD).
+        cookies_locator = await self._storage.save_cookies(
             profile.platform, account_id, cookies
         )
 
         # Actualizar perfil: cookies_path, estado y contador de refresco.
-        profile.cookies_path = str(cookies_file)
+        profile.cookies_path = cookies_locator
         profile.status = AccountStatus.ACTIVE
         profile.activity.reset_cookie_refresh_counter()
         profile.touch_updated()
@@ -423,30 +434,187 @@ class AccountManager:
         profile = await self._storage.load(account_id)
         if not profile:
             return None
-        return self._local_storage.load_cookies(profile.platform, account_id)
+        return await self._storage.load_cookies(profile.platform, account_id)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Sección 2b: Acceso directo a cookies (para scrapers)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    async def save_cookies(
+        self,
+        platform: str,
+        account_id: str,
+        cookies: list[dict[str, Any]],
+    ) -> str:
+        """Persiste cookies de una cuenta en el backend activo.
+
+        Args:
+            platform:   ``"facebook"`` o ``"instagram"``.
+            account_id: UUID4 de la cuenta.
+            cookies:    Lista de dicts de cookies en formato Playwright.
+
+        Returns:
+            Locator (string opaco) del lugar donde quedaron guardadas.
+
+        Raises:
+            StorageError: Si el backend no puede persistirlas.
+        """
+        return await self._storage.save_cookies(platform, account_id, cookies)
+
+    async def load_cookies(
+        self,
+        platform: str,
+        account_id: str,
+    ) -> list[dict[str, Any]] | None:
+        """Lee las cookies de una cuenta desde el backend activo.
+
+        Args:
+            platform:   ``"facebook"`` o ``"instagram"``.
+            account_id: UUID4 de la cuenta.
+
+        Returns:
+            Lista de dicts de cookies, o ``None`` si la cuenta no tiene.
+
+        Raises:
+            StorageError: Si el backend no puede leerlas.
+        """
+        return await self._storage.load_cookies(platform, account_id)
+
+    async def delete_cookies(
+        self,
+        platform: str,
+        account_id: str,
+    ) -> bool:
+        """Elimina las cookies de una cuenta del backend activo.
+
+        Args:
+            platform:   ``"facebook"`` o ``"instagram"``.
+            account_id: UUID4 de la cuenta.
+
+        Returns:
+            ``True`` si existían y se eliminaron, ``False`` si no existían.
+        """
+        return await self._storage.delete_cookies(platform, account_id)
+
+    async def close(self) -> None:
+        """Cierra los recursos del backend (pools de conexión, clientes)."""
+        await self._storage.close()
 
     # ─────────────────────────────────────────────────────────────────────────
     # Sección 3: Rotación y registro de actividad
     # ─────────────────────────────────────────────────────────────────────────
 
+    async def resolve_account(
+        self,
+        identifier: str,
+        platform: str | None = None,
+    ) -> AccountProfile | None:
+        """Localiza una cuenta por su identificador.
+
+        Acepta, en orden de precedencia:
+        1. ``account_id`` (UUID4 interno de la cuenta).
+        2. ``username`` (nombre de usuario o email registrado).
+        3. ID de usuario de la plataforma (``c_user`` en Facebook,
+           ``ds_user_id`` en Instagram), buscado en las cookies.
+
+        Args:
+            identifier: El valor a buscar (account_id, username o ID de usuario).
+            platform:   Restringe la búsqueda a ``"facebook"`` o
+                        ``"instagram"``. ``None`` busca en ambas plataformas.
+
+        Returns:
+            ``AccountProfile`` si se encontró exactamente una cuenta,
+            ``None`` si no hay coincidencia.
+
+        Raises:
+            StorageError: Si el backend falla al leer.
+        """
+        # 1. account_id exacto (formato UUID4).
+        if _is_uuid(identifier):
+            profile = await self._storage.load(identifier)
+            if profile is not None and (platform is None or profile.platform == platform):
+                return profile
+
+        # 2. username exacto (dentro de la plataforma si se indica).
+        accounts = await self._storage.list_all(platform=platform)
+        for acc in accounts:
+            if acc.username == identifier:
+                return acc
+
+        # 3. ID de usuario de la plataforma (solo para valores numéricos,
+        #    evitando leer cookies de todas las cuentas para cada búsqueda).
+        if identifier.isdigit() and len(identifier) >= 5:
+            for acc in accounts:
+                if await self._account_matches_platform_user_id(acc, identifier):
+                    return acc
+
+        logger.debug("Cuenta no encontrada | identifier=%s | platform=%s", identifier, platform)
+        return None
+
+    async def _account_matches_platform_user_id(
+        self,
+        account: AccountProfile,
+        user_id: str,
+    ) -> bool:
+        """Comprueba si una cuenta tiene el ID de usuario de plataforma dado."""
+        cookie_name = PLATFORM_USER_ID_COOKIE.get(account.platform)
+        if not cookie_name:
+            return False
+        try:
+            cookies = await self._storage.load_cookies(account.platform, account.account_id)
+        except StorageError:
+            return False
+        if not cookies:
+            return False
+        return any(
+            c.get("name") == cookie_name and str(c.get("value", "")) == user_id
+            for c in cookies
+        )
+
     async def get_account_for_request(
         self,
         platform: str,
+        *,
+        preferred: str | None = None,
     ) -> AccountProfile | None:
-        """Selecciona la mejor cuenta disponible para hacer una petición.
+        """Selecciona la cuenta a usar en una petición.
 
-        Carga todas las cuentas de la plataforma y delega la selección
-        al ``AccountRotator``.
+        Si se indica ``preferred`` (account_id, username o ID de usuario de
+        plataforma), se usa esa cuenta concreta, ignorando el rotador. Es la
+        forma de forzar manualmente una cuenta para una petición determinada.
+
+        Si no hay ``preferred``, carga todas las cuentas de la plataforma y
+        delega la selección al ``AccountRotator`` (comportamiento original).
 
         Retorna ``None`` (sin excepción) cuando no hay cuentas disponibles,
         permitiendo que el scraper caiga en modo anónimo.
 
         Args:
             platform: ``"facebook"`` o ``"instagram"``.
+            preferred: Identificador opcional de la cuenta a forzar
+                (``account_id``, ``username`` o ID de usuario de la plataforma).
 
         Returns:
             ``AccountProfile`` seleccionada, o ``None`` si no hay candidatas.
         """
+        if preferred is not None:
+            account = await self.resolve_account(preferred, platform=platform)
+            if account is None:
+                logger.warning(
+                    "Cuenta preferida no encontrada | preferred=%s | platform=%s",
+                    preferred,
+                    platform,
+                )
+            elif not account.is_selectable:
+                logger.warning(
+                    "Cuenta preferida no seleccionable | preferred=%s | "
+                    "username=%s | status=%s",
+                    preferred,
+                    account.username,
+                    account.status.value,
+                )
+            return account
+
         accounts = await self._storage.list_all(platform=platform)
         return self._rotator.select(accounts, platform=platform)
 
@@ -665,3 +833,24 @@ class AccountManager:
             return recent_window
 
         return int(recent_fail_ratio * recent_window)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers privados del módulo
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _is_uuid(value: str) -> bool:
+    """True si ``value`` tiene formato UUID4 (cuenta_id interno).
+
+    Args:
+        value: Cadena a comprobar.
+
+    Returns:
+        ``True`` si es un UUID válido, ``False`` en caso contrario.
+    """
+    try:
+        uuid.UUID(value)
+        return True
+    except (ValueError, AttributeError, TypeError):
+        return False

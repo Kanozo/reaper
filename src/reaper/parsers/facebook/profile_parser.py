@@ -144,7 +144,7 @@ class ProfileParser(FacebookContentParser):
             self._extract_timeline_feed()
             self._parse_traffic()
             logger.debug(
-                f"Perfil parseado. Feed: {len(self.result["feed"])} posts",
+                f"Perfil parseado. Feed: {len(self.result['feed'])} posts"
             )
         except Exception as exc:
             self.result["error"] = str(exc)
