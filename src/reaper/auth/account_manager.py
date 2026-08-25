@@ -156,7 +156,14 @@ class AccountManager:
         username: str,
         cookies: list[dict[str, Any]] | None = None,
         cookies_file: str | Path | None = None,
-        email: str | None = None,
+        name: str = "",
+        avatar: str | None = None,
+        description: str = "",
+        biography: str = "",
+        followers_count: int = 0,
+        following_count: int = 0,
+        friends_count: int = 0,
+        password: str | None = None,
         notes: str = "",
     ) -> AccountProfile:
         """Registra una nueva cuenta en el sistema.
@@ -174,7 +181,14 @@ class AccountManager:
             username:     Nombre de usuario de la cuenta.
             cookies:      Lista de dicts de cookies (formato Playwright).
             cookies_file: Ruta alternativa a un archivo JSON de cookies.
-            email:        Email asociado (informativo, opcional).
+            name:         Nombre público del perfil (ej. "Kanozo Gonzalez").
+            avatar:       Avatar del perfil en base64 (binario), o None.
+            description:  Breve descripción del perfil.
+            biography:    Biografía completa del perfil.
+            followers_count: Personas que siguen el perfil.
+            following_count: Perfiles que sigue este usuario.
+            friends_count:   Número de amigos del perfil.
+            password:      Contraseña de la cuenta (texto plano), o None.
             notes:        Notas libres del operador.
 
         Returns:
@@ -198,7 +212,14 @@ class AccountManager:
         profile = AccountProfile(
             platform=platform,
             username=username,
-            email=email,
+            name=name,
+            avatar=avatar,
+            description=description,
+            biography=biography,
+            followers_count=followers_count,
+            following_count=following_count,
+            friends_count=friends_count,
+            password=password,
             notes=notes,
         )
 

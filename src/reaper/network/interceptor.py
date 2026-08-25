@@ -91,6 +91,10 @@ class CapturedResponse:
         status:   Código de estado HTTP.
         category: ``"graphql"`` | ``"api"``.
         timestamp: Momento de captura.
+        operation: Nombre de la operación GraphQL que originó esta respuesta
+            (``fb_api_req_friendly_name`` del request correspondiente). Más
+            fiable que emparejar por URL, ya que todas las peticiones GraphQL
+            comparten el mismo endpoint ``/api/graphql/``.
         body:     Body parseado como dict. None si no es JSON.
         body_raw: Body crudo como string. Solo en modo debug.
         headers:  Headers HTTP de la respuesta.
@@ -100,6 +104,7 @@ class CapturedResponse:
     status: int
     category: str
     timestamp: datetime
+    operation: str | None = None
     # Facebook puede responder con un único objeto JSON (dict) o con múltiples
     # fragmentos NDJSON / Incremental Delivery (list[dict]). Usar siempre
     # CapturedTraffic.normalize_body(resp.body) para iterar de forma uniforme.
@@ -470,6 +475,7 @@ class NetworkInterceptor:
             status=status,
             category=category,
             timestamp=datetime.now(),
+            operation=self._request_friendly_name(request),
             body=body,
             body_raw=body_raw if self.debug else None,
             headers=response_headers,
@@ -681,6 +687,27 @@ class NetworkInterceptor:
             variables=variables,
             caller_class=post_data.get("fb_api_caller_class"),
         )
+
+    @staticmethod
+    def _request_friendly_name(request: Request) -> str | None:
+        """
+        Extrae el nombre de operación GraphQL de un request de Playwright.
+
+        Args:
+            request: Request de Playwright (con body disponible en requestfinished).
+
+        Returns:
+            ``fb_api_req_friendly_name`` o None.
+        """
+        try:
+            post_data = request.post_data_json
+        except Exception:
+            post_data = None
+        if isinstance(post_data, dict):
+            name = post_data.get("fb_api_req_friendly_name")
+            if isinstance(name, str) and name:
+                return name
+        return None
 
     @staticmethod
     def _parse_response_body(raw: str) -> list[dict[str, Any]] | None:

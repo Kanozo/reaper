@@ -16,7 +16,7 @@ import random
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from playwright.async_api import ElementHandle, Locator, Page
+    from playwright.async_api import Page
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +106,7 @@ def _bezier_points(
     return points
 
 
-async def human_move_to(page: "Page", target_x: float, target_y: float) -> None:
+async def human_move_to(page: Page, target_x: float, target_y: float) -> None:
     """
     Mueve el ratón hasta ``(target_x, target_y)`` describiendo una curva de Bézier.
 
@@ -141,7 +141,7 @@ async def human_move_to(page: "Page", target_x: float, target_y: float) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def human_click(
-    page: "Page",
+    page: Page,
     selector: str,
     timeout: int = 10_000,
     move_first: bool = True,
@@ -173,7 +173,7 @@ async def human_click(
 
 
 async def human_type(
-    page: "Page",
+    page: Page,
     selector: str,
     text: str,
     clear_first: bool = False,
@@ -197,6 +197,12 @@ async def human_type(
     element = page.locator(selector).first
     await element.wait_for(state="visible", timeout=8_000)
     await human_click(page, selector)
+    # Los editores lexical de Facebook requieren foco explícito: el click
+    # humano no siempre coloca el caret (el diálogo puede estar animándose).
+    try:
+        await element.focus()
+    except Exception as _exc:  # pragma: no cover
+        logger.debug("human_type: focus fallido (%s)", _exc)
 
     if clear_first:
         await page.keyboard.press("Control+a")
@@ -237,7 +243,7 @@ async def human_type(
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def human_scroll(
-    page: "Page",
+    page: Page,
     direction: str = "down",
     amount: int | None = None,
 ) -> None:
@@ -273,7 +279,7 @@ async def human_scroll(
         await asyncio.sleep(random.uniform(0.15, 0.60))
 
 
-async def human_scroll_to_element(page: "Page", selector: str) -> None:
+async def human_scroll_to_element(page: Page, selector: str) -> None:
     """
     Hace scroll hasta un elemento usando ``scrollIntoView`` + movimiento de ratón.
 
@@ -297,7 +303,7 @@ async def human_scroll_to_element(page: "Page", selector: str) -> None:
 # Comportamiento idle y distracción
 # ─────────────────────────────────────────────────────────────────────────────
 
-async def simulate_idle(page: "Page", duration_seconds: float = 2.0) -> None:
+async def simulate_idle(page: Page, duration_seconds: float = 2.0) -> None:
     """
     Simula a un usuario idle: pequeños movimientos del ratón mientras espera.
 
@@ -328,7 +334,7 @@ async def simulate_idle(page: "Page", duration_seconds: float = 2.0) -> None:
         elapsed += pause
 
 
-async def simulate_reading_pause(page: "Page", words_estimate: int = 50) -> None:
+async def simulate_reading_pause(page: Page, words_estimate: int = 50) -> None:
     """
     Pausa proporcional al tiempo que tardaría un humano en leer el contenido.
 
@@ -345,7 +351,7 @@ async def simulate_reading_pause(page: "Page", words_estimate: int = 50) -> None
     await simulate_idle(page, reading_seconds)
 
 
-async def simulate_distraction(page: "Page") -> None:
+async def simulate_distraction(page: Page) -> None:
     """
     Simula que el usuario se distrajo brevemente (cambió de tab mentalmente).
 
@@ -370,7 +376,7 @@ async def simulate_distraction(page: "Page") -> None:
     await asyncio.sleep(random.uniform(0.5, 3.0))
 
 
-async def simulate_page_focus_blur(page: "Page") -> None:
+async def simulate_page_focus_blur(page: Page) -> None:
     """
     Simula eventos de foco/desenfoque de página (el usuario cambia de pestaña).
 

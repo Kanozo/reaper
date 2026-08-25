@@ -19,17 +19,24 @@ Diseño:
 Esquema (creado automáticamente en ``connect()``)::
 
     CREATE TABLE IF NOT EXISTS accounts (
-        account_id   TEXT PRIMARY KEY,
-        platform     TEXT NOT NULL,
-        username     TEXT NOT NULL,
-        email        TEXT,
-        status       TEXT NOT NULL,
-        cookies      JSONB,
-        cookies_path TEXT,
-        activity     JSONB NOT NULL,
-        created_at   TEXT NOT NULL,
-        updated_at   TEXT NOT NULL,
-        notes        TEXT NOT NULL DEFAULT ''
+        account_id      TEXT PRIMARY KEY,
+        platform        TEXT NOT NULL,
+        username        TEXT NOT NULL,
+        name            TEXT NOT NULL DEFAULT '',
+        avatar          TEXT,
+        description     TEXT NOT NULL DEFAULT '',
+        biography       TEXT NOT NULL DEFAULT '',
+        followers_count INTEGER NOT NULL DEFAULT 0,
+        following_count INTEGER NOT NULL DEFAULT 0,
+        friends_count   INTEGER NOT NULL DEFAULT 0,
+        status          TEXT NOT NULL,
+        cookies         JSONB,
+        cookies_path    TEXT,
+        password        TEXT,
+        activity        JSONB NOT NULL,
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL,
+        notes           TEXT NOT NULL DEFAULT ''
     );
 
 Ejemplo::
@@ -139,19 +146,28 @@ class PostgresStorage(BaseAccountStorage):
         assert self._pool is not None
         query = f"""
             INSERT INTO {self._table}
-                (account_id, platform, username, email, status, cookies_path,
-                 activity, created_at, updated_at, notes)
-            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10)
+                (account_id, platform, username, name, avatar, description,
+                 biography, followers_count, following_count, friends_count,
+                 status, cookies_path, password, activity, created_at, updated_at, notes)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                    $14::jsonb, $15, $16, $17)
             ON CONFLICT (account_id) DO UPDATE SET
-                platform     = EXCLUDED.platform,
-                username     = EXCLUDED.username,
-                email        = EXCLUDED.email,
-                status       = EXCLUDED.status,
-                cookies_path = EXCLUDED.cookies_path,
-                activity     = EXCLUDED.activity,
-                created_at   = EXCLUDED.created_at,
-                updated_at   = EXCLUDED.updated_at,
-                notes        = EXCLUDED.notes
+                platform         = EXCLUDED.platform,
+                username         = EXCLUDED.username,
+                name             = EXCLUDED.name,
+                avatar           = EXCLUDED.avatar,
+                description      = EXCLUDED.description,
+                biography        = EXCLUDED.biography,
+                followers_count  = EXCLUDED.followers_count,
+                following_count  = EXCLUDED.following_count,
+                friends_count    = EXCLUDED.friends_count,
+                status           = EXCLUDED.status,
+                cookies_path     = EXCLUDED.cookies_path,
+                password         = EXCLUDED.password,
+                activity         = EXCLUDED.activity,
+                created_at       = EXCLUDED.created_at,
+                updated_at       = EXCLUDED.updated_at,
+                notes            = EXCLUDED.notes
         """
         try:
             async with self._pool.acquire() as conn:
@@ -160,9 +176,16 @@ class PostgresStorage(BaseAccountStorage):
                     account.account_id,
                     account.platform,
                     account.username,
-                    account.email,
+                    account.name,
+                    account.avatar,
+                    account.description,
+                    account.biography,
+                    account.followers_count,
+                    account.following_count,
+                    account.friends_count,
                     account.status.value,
                     account.cookies_path,
+                    account.password,
                     json.dumps(account.activity.to_dict()),
                     account.created_at,
                     account.updated_at,
@@ -183,8 +206,9 @@ class PostgresStorage(BaseAccountStorage):
         await self._require_pool()
         assert self._pool is not None
         query = f"""
-            SELECT account_id, platform, username, email, status, cookies_path,
-                   activity, created_at, updated_at, notes
+            SELECT account_id, platform, username, name, avatar, description,
+                   biography, followers_count, following_count, friends_count,
+                   status, cookies_path, password, activity, created_at, updated_at, notes
             FROM {self._table}
             WHERE account_id = $1
         """
@@ -226,15 +250,17 @@ class PostgresStorage(BaseAccountStorage):
         assert self._pool is not None
         if platform:
             query = (
-                f"SELECT account_id, platform, username, email, status, "
-                f"cookies_path, activity, created_at, updated_at, notes "
+                f"SELECT account_id, platform, username, name, avatar, description, "
+                f"biography, followers_count, following_count, friends_count, "
+                f"status, cookies_path, password, activity, created_at, updated_at, notes "
                 f"FROM {self._table} WHERE platform = $1"
             )
             params: tuple[Any, ...] = (platform,)
         else:
             query = (
-                f"SELECT account_id, platform, username, email, status, "
-                f"cookies_path, activity, created_at, updated_at, notes "
+                f"SELECT account_id, platform, username, name, avatar, description, "
+                f"biography, followers_count, following_count, friends_count, "
+                f"status, cookies_path, password, activity, created_at, updated_at, notes "
                 f"FROM {self._table}"
             )
             params = ()
@@ -368,17 +394,24 @@ class PostgresStorage(BaseAccountStorage):
         assert self._pool is not None
         ddl = f"""
             CREATE TABLE IF NOT EXISTS {self._table} (
-                account_id   TEXT PRIMARY KEY,
-                platform     TEXT NOT NULL,
-                username     TEXT NOT NULL,
-                email        TEXT,
-                status       TEXT NOT NULL,
-                cookies      JSONB,
-                cookies_path TEXT,
-                activity     JSONB NOT NULL,
-                created_at   TEXT NOT NULL,
-                updated_at   TEXT NOT NULL,
-                notes        TEXT NOT NULL DEFAULT ''
+                account_id      TEXT PRIMARY KEY,
+                platform        TEXT NOT NULL,
+                username        TEXT NOT NULL,
+                name            TEXT NOT NULL DEFAULT '',
+                avatar          TEXT,
+                description     TEXT NOT NULL DEFAULT '',
+                biography       TEXT NOT NULL DEFAULT '',
+                followers_count INTEGER NOT NULL DEFAULT 0,
+                following_count INTEGER NOT NULL DEFAULT 0,
+                friends_count   INTEGER NOT NULL DEFAULT 0,
+                status          TEXT NOT NULL,
+                cookies         JSONB,
+                cookies_path    TEXT,
+                password        TEXT,
+                activity        JSONB NOT NULL,
+                created_at      TEXT NOT NULL,
+                updated_at      TEXT NOT NULL,
+                notes           TEXT NOT NULL DEFAULT ''
             )
         """
         async with self._pool.acquire() as conn:
@@ -392,9 +425,16 @@ class PostgresStorage(BaseAccountStorage):
                 "account_id": row["account_id"],
                 "platform": row["platform"],
                 "username": row["username"],
-                "email": row["email"],
+                "name": row["name"],
+                "avatar": row["avatar"],
+                "description": row["description"],
+                "biography": row["biography"],
+                "followers_count": row["followers_count"],
+                "following_count": row["following_count"],
+                "friends_count": row["friends_count"],
                 "status": row["status"],
                 "cookies_path": row["cookies_path"],
+                "password": row["password"],
                 "activity": row["activity"] or {},
                 "created_at": row["created_at"],
                 "updated_at": row["updated_at"],

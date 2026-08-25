@@ -54,24 +54,33 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-# ── API de scraping ────────────────────────────────────────────────────────
-from reaper.config import ScraperConfig
-from reaper.core import Reaper, ScrapingError, UnsupportedPlatformError
+# ── API de acciones de escritura ───────────────────────────────────────────
+from reaper.actions import (
+    ActionError,
+    ActionManager,
+    ActionResult,
+    ActionType,
+    build_action_storage,
+)
 
 # ── API de gestión de cuentas ──────────────────────────────────────────────
 from reaper.auth import AccountManager
 from reaper.auth.models import AccountActivity, AccountProfile, AccountStatus
 from reaper.auth.storage.base import BaseAccountStorage, StorageError
 from reaper.auth.storage.config import (
-    StorageConfig,
     MongoConfig,
     PostgresConfig,
+    StorageConfig,
     build_storage,
     load_storage_config,
 )
 from reaper.auth.storage.local import LocalFileStorage
 from reaper.auth.storage.mongodb import MongoStorage
 from reaper.auth.storage.postgres import PostgresStorage
+
+# ── API de scraping ────────────────────────────────────────────────────────
+from reaper.config import ScraperConfig
+from reaper.core import Reaper, ScrapingError, UnsupportedPlatformError
 
 if TYPE_CHECKING:
     pass
@@ -91,6 +100,12 @@ __all__ = [
     "AccountProfile",
     "AccountActivity",
     "AccountStatus",
+    # Acciones de escritura
+    "ActionManager",
+    "ActionType",
+    "ActionResult",
+    "ActionError",
+    "build_action_storage",
     # Storage (para extensión con BD propia)
     "BaseAccountStorage",
     "LocalFileStorage",
@@ -109,7 +124,7 @@ __all__ = [
 async def scrape(
     url: str,
     *,
-    account_manager: "AccountManager | None" = None,
+    account_manager: AccountManager | None = None,
     headless: bool = True,
     debug: bool = False,
     screenshot: bool = False,

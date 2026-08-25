@@ -93,3 +93,6 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"           # Todos los tests async sin decorador extra
 testpaths    = ["tests"]
+markers      = [
+    "e2e: tests que lanzan Camoufox de verdad contra www.facebook.com (requieren cuenta/cookies)",
+]

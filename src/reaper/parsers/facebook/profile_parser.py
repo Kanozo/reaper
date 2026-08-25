@@ -11,9 +11,17 @@ logger = get_logger(__name__)
 _OG_LIKES_PATTERN = re.compile(r"([\d,\.]+)\s+likes", re.IGNORECASE)
 _OG_TALKING_PATTERN = re.compile(r"([\d,\.]+)\s+talking about this", re.IGNORECASE)
 
-# Social context: "1.4K followers", "31 following", "1.2K friends"
+# Social context: "1.4K followers", "31 following", "1.2K friends",
+# "1,6 mil seguidores", "44 seguidos", "1.211 amigos"
 _SOCIAL_COUNT_PATTERN = re.compile(
-    r"([\d,\.]+[KkMmBb]?)\s*(followers?|following|friends?)",
+    r"([\d,\.]+\s*(?:mil|[KkMmBb])?)\s*"
+    r"(followers?|following|friends?|seguidores|seguidos|amigos)",
+    re.IGNORECASE,
+)
+
+# Conteo de amigos en el HTML renderizado (tarjeta "Amigos" con link /friends)
+_FRIENDS_HTML_PATTERN = re.compile(
+    r"([\d,\.]+\s*(?:mil|[KkMmBb])?)\s*(?:amigos?|friends?)",
     re.IGNORECASE,
 )
 
@@ -427,14 +435,37 @@ class ProfileParser(FacebookContentParser):
             count = self._parse_human_number(match.group(1))
             kind = match.group(2).lower()
 
-            if "follower" in kind:
+            if "follower" in kind or "seguidor" in kind:
                 followers = count
-            elif "following" in kind:
+            elif "following" in kind or "seguido" in kind:
                 following = count
-            elif "friend" in kind:
+            elif "friend" in kind or "amigo" in kind:
                 friends = count
 
+        # El conteo de amigos puede no estar en profile_social_context
+        # (Facebook lo renderiza como tarjeta "Amigos" con link /friends).
+        if friends == 0:
+            friends = self._extract_friends_from_html()
+
         return followers, following, friends
+
+    def _extract_friends_from_html(self) -> int:
+        """Extrae el número de amigos desde el HTML renderizado.
+
+        En perfiles con locale en español, ``profile_social_context`` solo
+        contiene seguidores y seguidos; el conteo de amigos aparece en una
+        tarjeta separada cuyo enlace apunta a ``/friends``. Este método
+        localiza ese enlace y busca el número justo después del mismo.
+
+        Returns:
+            Número de amigos como entero, o 0 si no se encuentra.
+        """
+        for m in re.finditer(r'href="https://www\.facebook\.com/[^"]*/friends"', self.html_content):
+            chunk = self.html_content[m.end():m.end() + 3000]
+            fm = _FRIENDS_HTML_PATTERN.search(chunk)
+            if fm:
+                return self._parse_human_number(fm.group(1))
+        return 0
 
     def _parse_og_metrics(self) -> tuple[int, int]:
         """Parsea likes y talking_about desde el OG meta description.
@@ -979,15 +1010,86 @@ class ProfileParser(FacebookContentParser):
             return 0
 
     def _extract_intro_card_info(self) -> None:
-        """Extrae educación, ciudad actual y lugar de origen del perfil."""
+        """Extrae educación, ciudad actual y lugar de origen del perfil.
+
+        Facebook cambió la estructura de los intro cards: ahora viven bajo
+        ``profile_intro_card.context_items.edges[].node`` con un campo
+        ``profile_field_type`` (``college``, ``current_city``, ``hometown``,
+        ``category``, ``screenname``, ...). El lugar de origen (hometown)
+        puede aparecer también en ``profile_tile_sections`` con
+        ``pressable_profile_field_type == "HOMETOWN"``.
+        """
         self.result["education"]    = self._get_intro_card("INTRO_CARD_EDUCATION")
         self.result["current_city"] = self._get_intro_card("INTRO_CARD_CURRENT_CITY")
         self.result["hometown"]     = self._get_intro_card("INTRO_CARD_HOMETOWN")
 
+    # Mapeo de tipos de intro card antiguos → nuevos profile_field_type.
+    _INTRO_CARD_FIELD_MAP: dict[str, str] = {
+        "INTRO_CARD_EDUCATION":    "college",
+        "INTRO_CARD_CURRENT_CITY": "current_city",
+        "INTRO_CARD_HOMETOWN":     "hometown",
+    }
+
     def _get_intro_card(self, card_type: str) -> dict[str, str]:
-        """Busca un nodo INTRO_CARD por tipo y devuelve text, name, url, id."""
+        """Busca un intro card por tipo y devuelve text, name, url, id.
+
+        Soporta dos formatos de Facebook:
+
+        - **Nuevo**: nodo ``profile_intro_card`` con ``context_items.edges``
+          y ``profile_field_type`` (``college``, ``current_city``, ...).
+        - **Antiguo**: nodos con ``timeline_context_list_item_type`` igual a
+          ``INTRO_CARD_*`` (formato legado).
+
+        Para ``hometown``, si no aparece en el intro card, se busca en las
+        ``profile_tile_sections`` (``pressable_profile_field_type``).
+        """
         empty = {"text": "", "name": "", "url": "", "id": ""}
 
+        # ── Formato nuevo: profile_intro_card.context_items ────────────────
+        expected = self._INTRO_CARD_FIELD_MAP.get(card_type)
+        if expected:
+            node = self._recursive_search(
+                self._blocks,
+                condition=lambda n: (
+                    "profile_intro_card" in n
+                    and isinstance(n.get("profile_intro_card"), dict)
+                ),
+            )
+            if node:
+                intro = node.get("profile_intro_card") or {}
+                for edge in intro.get("context_items", {}).get("edges", []):
+                    item = edge.get("node") or {}
+                    if item.get("profile_field_type") != expected:
+                        continue
+
+                    text = self._safe_get(item, "short_title", "text", default="")
+                    ranges = self._safe_get(
+                        item, "short_title", "ranges", default=[]
+                    )
+                    entity = ranges[0].get("entity", {}) if ranges else {}
+
+                    return {
+                        "text": text,
+                        "name": (
+                            entity.get("short_name")
+                            or entity.get("name")
+                            or text
+                        ),
+                        "url": (
+                            item.get("page_uri")
+                            or entity.get("url")
+                            or entity.get("comet_url")
+                            or entity.get("profile_url")
+                            or ""
+                        ),
+                        "id": entity.get("id", ""),
+                    }
+
+                # Hometown no siempre está en el intro card → buscar en tiles.
+                if expected == "hometown":
+                    return self._get_hometown_from_tiles()
+
+        # ── Formato antiguo: timeline_context_list_item_type ───────────────
         for block in self._blocks:
             nodes = self._find_all_nodes(
                 block,
@@ -1016,34 +1118,90 @@ class ProfileParser(FacebookContentParser):
             }
 
         return empty
+
+    def _get_hometown_from_tiles(self) -> dict[str, str]:
+        """Busca el lugar de origen en ``profile_tile_sections``.
+
+        El hometown puede aparecer como tile con
+        ``pressable_profile_field_type == "HOMETOWN"`` dentro de la sección
+        ``PERSONAL_DETAILS``. El texto visible está en
+        ``item_subtitle.text.text`` (ej. "De La Habana").
+
+        Returns:
+            Dict ``{text, name, url, id}``, o vacío si no se encuentra.
+        """
+        empty = {"text": "", "name": "", "url": "", "id": ""}
+        node = self._recursive_search(
+            self._blocks,
+            condition=lambda n: (
+                "profile_tile_sections" in n
+                and isinstance(n.get("profile_tile_sections"), dict)
+            ),
+        )
+        if not node:
+            return empty
+
+        sections = node.get("profile_tile_sections") or {}
+        for edge in sections.get("edges", []):
+            tsec = edge.get("node") or {}
+            for view in tsec.get("profile_tile_views", {}).get("nodes", []):
+                vsr = view.get("view_style_renderer") or {}
+                v = vsr.get("view") or {}
+                for item in v.get("profile_tile_items", {}).get("nodes", []):
+                    tir = item.get("directory_tile_item_renderer") or {}
+                    ti = tir.get("tile_item") or {}
+                    if ti.get("pressable_profile_field_type") != "HOMETOWN":
+                        continue
+
+                    text = self._safe_get(
+                        ti, "item_subtitle", "text", "text", default=""
+                    )
+                    logging = ti.get("client_logging_data") or {}
+                    return {
+                        "text": text,
+                        "name": text,
+                        "url":  "",
+                        "id":   logging.get("content_id", ""),
+                    }
+        return empty
     
     def _extract_contact_info(self) -> None:
         """Extrae email, teléfono, sitios web y cuentas de otras redes sociales.
 
-        Todos los datos provienen de nodos ``INTRO_CARD_*`` embebidos en el HTML:
+        Facebook renderiza la información de contacto directamente en el HTML
+        (sección «Información de contacto» / «Contact info») en lugar de
+        embeber nodos ``INTRO_CARD_*``. Este método parsea esa sección:
 
-        - ``INTRO_CARD_PROFILE_EMAIL`` → ``contact_info.email``
-        - ``INTRO_CARD_PHONE``         → ``contact_info.phone``
-        - ``INTRO_CARD_WEBSITE``       → ``contact_info.websites[]``
-        - ``INTRO_CARD_OTHER_ACCOUNT`` → ``contact_info.social_accounts[]``
+        - ``<a href="mailto:...">``   → ``contact_info.email``
+        - ``<a href="tel:...">``      → ``contact_info.phone``
+        - ``<a href="l.facebook.com/l.php?u=...">`` (target _blank) → según
+          la URL destino se clasifica como red social (``social_accounts[]``)
+          o sitio web (``websites[]``).
 
         Para las URL de sitios web y redes sociales, el enlace bruto es un
         redirect de Facebook (``l.facebook.com/l.php?u=...``). Se extrae
         automáticamente la URL destino real.
+
+        Como respaldo, si la página aún contiene nodos ``INTRO_CARD_*``
+        (formato legado), se parsean igual que antes.
 
         Los campos no presentes en el HTML quedan como cadena vacía o lista
         vacía según corresponda.
 
         Actualiza ``self.result["contact_info"]`` in-place.
         """
+        contact = self.result["contact_info"]
+
+        # ── Formato nuevo: sección renderizada en el HTML ──────────────────
+        self._extract_contact_from_html(contact)
+
+        # ── Formato legado: nodos INTRO_CARD_* embebidos ──────────────────
         _CARD_MAP = {
             "INTRO_CARD_PROFILE_EMAIL": "email",
             "INTRO_CARD_PHONE":         "phone",
             "INTRO_CARD_WEBSITE":       "website",
             "INTRO_CARD_OTHER_ACCOUNT": "social",
         }
-
-        contact = self.result["contact_info"]
 
         for block in self._blocks:
             for card_type, field in _CARD_MAP.items():
@@ -1095,6 +1253,79 @@ class ProfileParser(FacebookContentParser):
                         }
                         if entry not in contact["social_accounts"]:
                             contact["social_accounts"].append(entry)
+
+    def _extract_contact_from_html(self, contact: dict[str, Any]) -> None:
+        """Parsea la sección «Información de contacto» del HTML renderizado.
+
+        Localiza el heading ``h2`` con texto «Información de contacto»
+        (o «Contact info») y recorre los enlaces de su bloque:
+
+        - ``mailto:`` → email (texto visible del enlace).
+        - ``tel:``    → phone.
+        - ``http(s)`` externos → social_accounts o websites según la
+          plataforma detectada en la URL destino limpia.
+
+        Args:
+            contact: Dict ``contact_info`` del resultado, mutado in-place.
+        """
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(self.html_content, "html.parser")
+
+        container = None
+        for h2 in soup.find_all("h2"):
+            text = h2.get_text(strip=True).lower()
+            if text not in ("información de contacto", "contact info"):
+                continue
+            node: Any = h2
+            for _ in range(12):
+                node = node.parent
+                if node is None:
+                    break
+                if node.find("a", href=re.compile(r"^(mailto:|tel:|https?:)")):
+                    container = node
+                    break
+            if container:
+                break
+
+        if container is None:
+            logger.debug("_extract_contact_info: sección de contacto no encontrada.")
+            return
+
+        for a in container.find_all("a", href=True):
+            href = str(a.get("href", "") or "")
+            display = a.get_text(strip=True)
+
+            if href.startswith("mailto:") and not contact["email"]:
+                contact["email"] = display
+                continue
+
+            if href.startswith("tel:") and not contact["phone"]:
+                contact["phone"] = display
+                continue
+
+            if not href.startswith(("http://", "https://")):
+                continue
+
+            clean_url = self._clean_fb_redirect_url(href)
+            platform = self._detect_social_platform(clean_url, display)
+
+            if platform != "other":
+                entry = {
+                    "platform": platform,
+                    "handle":   display,
+                    "url":      clean_url,
+                }
+                if entry not in contact["social_accounts"]:
+                    contact["social_accounts"].append(entry)
+            else:
+                if clean_url and not any(
+                    w["url"] == clean_url for w in contact["websites"]
+                ):
+                    contact["websites"].append({
+                        "display": display,
+                        "url": clean_url,
+                    })
 
     def _extract_photos_section(self) -> None:
         """Extrae las fotos de la sección «Photos» visible en el perfil.
@@ -1191,7 +1422,8 @@ class ProfileParser(FacebookContentParser):
 
         Los enlaces externos en el perfil pasan por
         ``https://l.facebook.com/l.php?u=<url_encoded>...``.
-        Este método extrae y decodifica la URL destino.
+        Este método extrae y decodifica la URL destino y elimina los
+        parámetros de tracking de Facebook (``fbclid``, ``h``, ``__cft``).
 
         Args:
             url: URL cruda (puede ser redirect de FB o URL directa).
@@ -1209,8 +1441,26 @@ class ProfileParser(FacebookContentParser):
             return url
         match = re.search(r"[?&]u=(https?[^&]+)", url)
         if match:
-            from urllib.parse import unquote
-            return unquote(match.group(1))
+            from urllib.parse import unquote, urlencode, urlsplit, urlunsplit
+
+            dest = unquote(match.group(1))
+
+            # Eliminar parámetros de tracking de Facebook de la URL destino.
+            try:
+                parts = urlsplit(dest)
+                query = [
+                    (k, v)
+                    for k, v in (
+                        pair.split("=", 1) for pair in parts.query.split("&") if pair
+                    )
+                    if k.lower() not in ("fbclid", "h", "__cft", "__tn", "cft")
+                ]
+                clean_query = urlencode(query)
+                return urlunsplit(
+                    (parts.scheme, parts.netloc, parts.path, clean_query, parts.fragment)
+                )
+            except Exception:
+                return dest
         return url
 
     def _detect_social_platform(self, url: str, text: str) -> str:
@@ -1253,10 +1503,19 @@ class ProfileParser(FacebookContentParser):
 
     @staticmethod
     def _parse_human_number(text: str) -> int:
-        """Convierte un número en formato legible (K, M, B) a int.
+        """Convierte un número en formato legible a int.
+
+        Soporta sufijos de millar en inglés (``K``, ``M``, ``B``) y español
+        (``mil``), así como los separadores de ambas locales:
+
+        - ``"1.4K"``   → 1400
+        - ``"1,413"``  → 1413
+        - ``"1.211"``  → 1211
+        - ``"1,6 mil"``→ 1600
+        - ``"44"``     → 44
 
         Args:
-            text: Número en formato humano (ej. ``"1.4K"``, ``"1,413"``).
+            text: Número en formato humano (ej. ``"1.4K"``, ``"1,6 mil"``).
 
         Returns:
             Valor entero, o 0 si no se puede parsear.
@@ -1264,20 +1523,23 @@ class ProfileParser(FacebookContentParser):
         if not text:
             return 0
 
-        clean = text.strip().upper().replace(",", "").replace(".", "")
-        # Con sufijo y punto decimal "1.4K" → ya limpiamos el punto
-        # Manejar "1K", "14K", "1M" etc.
-        multipliers = {"K": 1_000, "M": 1_000_000, "B": 1_000_000_000}
+        t = text.strip().upper()
+        multipliers = {"K": 1_000, "M": 1_000_000, "B": 1_000_000_000, "MIL": 1_000}
 
-        # Re-parsear con decimal para "1.4K"
-        clean_original = text.strip().upper().replace(",", "")
+        # Con sufijo: el separador decimal puede ser coma (español "1,6 mil")
+        # o punto (inglés "1.4K"). Normalizar a punto para float().
         for suffix, mult in multipliers.items():
-            if clean_original.endswith(suffix):
+            if t.endswith(suffix) and len(t) > len(suffix):
+                num_part = t[: -len(suffix)].strip()
+                if not num_part:
+                    return 0
                 try:
-                    return int(float(clean_original[:-1]) * mult)
+                    return int(float(num_part.replace(",", ".")) * mult)
                 except ValueError:
                     return 0
 
+        # Sin sufijo: entero; los separadores de miles son "." o ","
+        clean = t.replace(",", "").replace(".", "")
         try:
             return int(float(clean))
         except ValueError:

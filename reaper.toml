@@ -19,7 +19,7 @@
 # ==============================================================================
 
 [storage]
-backend = "local"              # local | postgres | mongodb
+backend = "mongodb"            # local | postgres | mongodb
 accounts_dir = "data/accounts" # solo se usa con backend="local"
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -36,17 +36,11 @@ accounts_dir = "data/accounts" # solo se usa con backend="local"
 # table = "accounts"  # nombre de la tabla (se crea sola al conectar)
 # ──────────────────────────────────────────────────────────────────────────────
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Backend MongoDB — descomenta para activar:
-#
-# [storage]
-# backend = "mongodb"
-#
-# [storage.mongodb]
-# uri = "mongodb://localhost:27017"
-# database = "reaper"
-# collection = "accounts"
-# ──────────────────────────────────────────────────────────────────────────────
+# Backend MongoDB (activo)
+[storage.mongodb]
+uri = "mongodb://localhost:27017"
+database = "reaper_h"
+collection = "accounts"
 
 # ==============================================================================
 # NOTAS DE SEGURIDAD

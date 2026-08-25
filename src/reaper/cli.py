@@ -43,9 +43,16 @@ import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import NoReturn
+from typing import Any, NoReturn
 
-from reaper import Reaper, ScrapingError, UnsupportedPlatformError, __version__
+from reaper import (
+    ActionError,
+    ActionManager,
+    Reaper,
+    ScrapingError,
+    UnsupportedPlatformError,
+    __version__,
+)
 from reaper.utils.logger import get_logger, setup_logging
 
 logger = get_logger(__name__)
@@ -179,7 +186,7 @@ ejemplos:
 
 
 def _write_output(
-    result: dict,
+    result: dict[str, Any],
     output_path: Path | None,
     indent: int,
 ) -> None:
@@ -217,13 +224,172 @@ def _exit_error(message: str, code: int = 1) -> NoReturn:
     sys.exit(code)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CLI de acciones de escritura (reaper action ...)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def build_action_parser() -> argparse.ArgumentParser:
+    """Construye el parser de ``reaper action <verb>``.
+
+    Returns:
+        ``argparse.ArgumentParser`` con subcomandos post/share/comment/like.
+    """
+    parser = argparse.ArgumentParser(
+        prog="reaper action",
+        description="Acciones de escritura autenticadas sobre Facebook.",
+        epilog="""
+ejemplos:
+  reaper action post --text "Hola desde Reaper" --images foto.jpg otro.png
+  reaper action post --text "Nota en el grupo" --group 123456789 --account mi_cuenta
+  reaper action share --post-url https://fb.com/... --group 123456789 --group-name "Mi Grupo"
+  reaper action comment --post-url https://fb.com/... --text "Excelente post"
+  reaper action like --post-url https://fb.com/...
+        """,
+    )
+    subparsers = parser.add_subparsers(dest="verb", required=True)
+
+    post_p = subparsers.add_parser("post", help="Publicar texto/imágenes en el muro o un grupo.")
+    post_p.add_argument("--text", default=None, help="Texto/caption de la publicación.")
+    post_p.add_argument("--images", nargs="+", metavar="ARCHIVO", default=None,
+                        help="Imágenes locales a adjuntar (jpg, png, ...).")
+    post_p.add_argument("--group", default=None,
+                        help="ID o URL de un grupo para publicar directamente en él.")
+
+    share_p = subparsers.add_parser("share", help="Compartir una publicación en un grupo.")
+    share_p.add_argument("--post-url", required=True, help="URL del post a compartir.")
+    share_p.add_argument("--group", required=True, help="Grupo de destino (ID o URL).")
+    share_p.add_argument("--group-name", default=None,
+                         help="Nombre visible del grupo (texto de búsqueda en el diálogo).")
+
+    comment_p = subparsers.add_parser("comment", help="Responder con texto a una publicación.")
+    comment_p.add_argument("--post-url", required=True, help="URL del post a comentar.")
+    comment_p.add_argument("--text", required=True, help="Texto del comentario.")
+
+    like_p = subparsers.add_parser("like", help="Reaccionar con Me gusta a una publicación.")
+    like_p.add_argument("--post-url", required=True, help="URL del post a reaccionar.")
+
+    _add_action_common_args(list(subparsers.choices.values()))
+    return parser
+
+
+def _add_action_common_args(parsers: list[argparse.ArgumentParser]) -> None:
+    """Añade los argumentos comunes a todos los subcomandos de acciones."""
+    for parser in parsers:
+        parser.add_argument("--account", metavar="IDENTIFICADOR", default=None,
+                            help="Cuenta a forzar (account_id, username o c_user).")
+        parser.add_argument("--no-headless", dest="headless", action="store_false",
+                            default=True, help="Mostrar la ventana del navegador.")
+        parser.add_argument("--proxy", dest="proxy_server", metavar="URL", default=None,
+                            help="Servidor proxy (p.ej. 'http://ip:8080').")
+        parser.add_argument("--proxy-user", dest="proxy_username", metavar="USUARIO",
+                            default=None, help="Usuario del proxy.")
+        parser.add_argument("--proxy-pass", dest="proxy_password", metavar="CONTRASEÑA",
+                            default=None, help="Contraseña del proxy.")
+        parser.add_argument("--confirm-timeout", type=int, default=15_000, metavar="MS",
+                            help="Timeout de confirmación DOM. Defecto: 15000.")
+        parser.add_argument("--output", "-o", type=Path, metavar="FICHERO", default=None,
+                            help="Guardar el resultado como JSON en FICHERO.")
+        parser.add_argument("--indent", type=int, default=2, metavar="N",
+                            help="Indentación del JSON de salida. Defecto: 2.")
+        parser.add_argument("--debug", action="store_true", default=False,
+                            help="Logging detallado.")
+
+
+async def _run_action(verb: str, args: argparse.Namespace) -> dict[str, Any]:
+    """Ejecuta una acción de escritura y devuelve el ``ActionResult`` como dict.
+
+    Args:
+        verb: Subcomando ({'post', 'share', 'comment', 'like'}).
+        args: Argumentos parseados del subcomando.
+
+    Returns:
+        Dict serializable del ``ActionResult``.
+
+    Raises:
+        ActionError: Si la acción no puede ejecutarse.
+    """
+    from reaper.auth import AccountManager
+
+    manager = ActionManager(
+        account_manager=AccountManager(),
+        headless=args.headless,
+        proxy_server=args.proxy_server,
+        proxy_username=args.proxy_username,
+        proxy_password=args.proxy_password,
+    )
+    try:
+        match verb:
+            case "post":
+                result = await manager.create_post(
+                    text=args.text,
+                    images=args.images,
+                    group=args.group,
+                    account=args.account,
+                    confirm_timeout=args.confirm_timeout,
+                )
+            case "share":
+                result = await manager.share_post(
+                    post_url=args.post_url,
+                    group=args.group,
+                    group_name=args.group_name,
+                    account=args.account,
+                    confirm_timeout=args.confirm_timeout,
+                )
+            case "comment":
+                result = await manager.comment(
+                    post_url=args.post_url,
+                    text=args.text,
+                    account=args.account,
+                    confirm_timeout=args.confirm_timeout,
+                )
+            case "like":
+                result = await manager.like(
+                    post_url=args.post_url,
+                    account=args.account,
+                    confirm_timeout=args.confirm_timeout,
+                )
+            case _:
+                raise ActionError(f"Verbo de acción no soportado: '{verb}'.")
+        return result.to_dict()
+    finally:
+        await manager.close()
+
+
+def _run_action_cli(argv: list[str]) -> None:
+    """Ejecuta el flujo CLI de acciones (``reaper action ...``)."""
+    setup_logging(
+        level="DEBUG" if "--debug" in argv else "INFO",
+        use_color=None,
+    )
+    parser = build_action_parser()
+    args = parser.parse_args(argv[1:])
+
+    try:
+        result = asyncio.run(_run_action(args.verb, args))
+    except ActionError as exc:
+        _exit_error(str(exc), code=5)
+
+    _write_output(result, args.output, args.indent)
+
+    # Código de salida no nulo si la plataforma no confirmó la acción.
+    if result.get("status") == "error":
+        sys.exit(1)
+
+
 def main() -> None:
     """Punto de entrada principal de la CLI.
 
     Registrado como ``reaper = "reaper.cli:main"`` en ``pyproject.toml``.
     Parsea los argumentos, ejecuta el scrape de forma asíncrona con
-    ``asyncio.run()`` y escribe el resultado.
+    ``asyncio.run()`` y escribe el resultado. Si el primer argumento es
+    ``action``, delega en ``_run_action_cli`` (acciones de escritura).
     """
+    # Detección del subcomando de acciones antes de construir el parser de scrape.
+    if len(sys.argv) > 1 and sys.argv[1] == "action":
+        _run_action_cli(sys.argv[1:])
+        return
+
     parser = build_parser()
     args = parser.parse_args()
 

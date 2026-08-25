@@ -667,6 +667,34 @@
   
   
     <li class="md-nav__item">
+      <a href="user/actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Acciones de escritura (posts, likes)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="user/pool/" class="md-nav__link">
         
   
@@ -1153,6 +1181,34 @@
   
   
     <li class="md-nav__item">
+      <a href="api/actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    reaper.actions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="api/config/" class="md-nav__link">
         
   
@@ -1432,13 +1488,15 @@
 <h1 id="reaper">Reaper<a class="headerlink" href="#reaper" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p>Librería Python para extraer datos estructurados de <strong>Facebook</strong> e <strong>Instagram</strong>.
-Versión <strong>0.2.3</strong> — Python 3.11+</p>
+Versión <strong>0.3.0</strong> — Python 3.11+</p>
 </blockquote>
 <hr />
 <p>Reaper convierte URLs de redes sociales en diccionarios Python listos para procesar.
 Soporta posts, reels, vídeos, fotos, grupos y perfiles de Facebook, y posts y reels
 de Instagram. Desde la versión 0.2.0 también gestiona <strong>sesiones autenticadas</strong>
-con rotación inteligente de cuentas.</p>
+con rotación inteligente de cuentas. Desde la versión 0.3.0 también incluye
+<strong>acciones de escritura</strong> (<code>ActionManager</code>): publicar posts (texto e imágenes),
+compartir a grupos, comentar y dar "Me gusta" desde una sesión autenticada.</p>
 <h2 id="instalacion">Instalación<a class="headerlink" href="#instalacion" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>.
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>playwright<span class="w"> </span>install<span class="w"> </span>firefox
@@ -1478,6 +1536,7 @@ con rotación inteligente de cuentas.</p>
 <li>Extraer posts, reels, vídeos, fotos, grupos y perfiles de Facebook.</li>
 <li>Extraer posts y reels de Instagram.</li>
 <li>Gestionar múltiples cuentas autenticadas con rotación inteligente.</li>
+<li>Escribir acciones autenticadas: posts, comentarios, likes y compartir a grupos.</li>
 <li>Almacenar cuentas y sesiones en local, PostgreSQL o MongoDB vía <code>reaper.toml</code>.</li>
 <li>Trabajar con proxies para anonimidad o distribución geográfica.</li>
 <li>Guardar artefactos de debug (HTML, tráfico GraphQL) para diagnóstico offline.</li>
@@ -1489,10 +1548,13 @@ con rotación inteligente de cuentas.</p>
 <li>No automatiza el proceso de login (siempre es manual por diseño).</li>
 <li>No garantiza funcionamiento si Facebook/Instagram cambia su estructura interna.</li>
 <li>No gestiona CAPTCHAs visuales ni verificaciones de seguridad de plataforma.</li>
+<li>Las acciones de escritura solo cubren Facebook (no Instagram) y requieren una
+  cuenta autenticada; no garantiza que los selectores de UI sigan funcionando
+  ante cambios del DOM.</li>
 </ul>
 <h2 id="estructura-del-proyecto">Estructura del proyecto<a class="headerlink" href="#estructura-del-proyecto" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>src/reaper/
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├── __init__.py          API pública: scrape(), Reaper, AccountManager
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├── __init__.py          API pública: scrape(), Reaper, AccountManager, ActionManager
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>├── cli.py               Comando reaper en la terminal
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>├── config.py            ScraperConfig — objeto de configuración central
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>├── core.py              Reaper — orquestador principal
@@ -1502,11 +1564,17 @@ con rotación inteligente de cuentas.</p>
 <a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>│   ├── rotator.py       Algoritmo de rotación por score
 <a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>│   ├── login.py         Flujo interactivo de login
 <a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>│   └── storage/         Backends de persistencia (local/PG/Mongo)
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>├── network/             Playwright + captura de tráfico (ContentFetcher)
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>├── anti_detection/      Fingerprint, stealth JS y comportamiento humano
-<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>├── scrapers/            Orquestadores por plataforma
-<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>├── parsers/             Extracción de datos del HTML/GraphQL
-<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>└── utils/               Utilidades compartidas
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>├── actions/             Acciones de escritura autenticadas (v0.3.0)
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>│   ├── manager.py       ActionManager — orquestador de posts/likes/comentarios
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>│   ├── actor.py         SessionActor — sesiones autenticadas con Camoufox
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>│   ├── models.py        ActionType, ActionResult, ActionError
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>│   ├── facebook/        Flujos de UI y selectores por plataforma
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>│   └── storage/         Persistencia de resultados de acciones (local/PG/Mongo)
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>├── network/             Playwright + captura de tráfico (ContentFetcher)
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>├── anti_detection/      Fingerprint, stealth JS y comportamiento humano
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>├── scrapers/            Orquestadores por plataforma
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>├── parsers/             Extracción de datos del HTML/GraphQL
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>└── utils/               Utilidades compartidas
 </code></pre></div>
 
 

@@ -63,6 +63,7 @@ nav:
     - Cuentas autenticadas: user/accounts.md
     - Almacenamiento (local/PG/Mongo): user/storage.md
     - Login interactivo: user/login.md
+    - Acciones de escritura (posts, likes): user/actions.md
     - Gestión del pool: user/pool.md
     - Proxies: user/proxy.md
     - Modo debug: user/debug.md
@@ -80,6 +81,7 @@ nav:
   - API Reference:
     - reaper (público): api/public.md
     - reaper.auth: api/auth.md
+    - reaper.actions: api/actions.md
     - reaper.config: api/config.md
     - reaper.network: api/network.md
     - reaper.scrapers: api/scrapers.md

@@ -1,5 +1,110 @@
 # Changelog
 
+## 0.4.0
+
+### Acciones de escritura — fiabilidad del flujo de posts
+
+- **Navegación al perfil propio para publicar en el muro**: `create_post()`
+  sin `group` ahora deriva la URL del perfil a partir del cookie `c_user` de
+  la cuenta (`https://www.facebook.com/profile.php?id={c_user}`) y navega
+  ahí, en lugar de al home. `resolve_profile_url()` en `reaper.actions.utils`.
+- **Apertura del composer**: la UI de escritorio muestra un trigger
+  ("¿Qué estás pensando?") que abre el diálogo con el campo de texto. Se añade
+  `COMPOSER_TRIGGER` / `GROUP_COMPOSER_TRIGGER` y el helper `_open_composer()`
+  en `reaper.actions.facebook.flows`: si el campo no está visible, se hace
+  clic en el trigger antes de escribir.
+- **Botones de envío en español**: `POST_SUBMIT` y el nuevo `GROUP_POST_SUBMIT`
+  incluyen variantes `aria-label='Publicar'` además de `Post`.
+- **Selectores ampliados**: `COMPOSER_INPUT` añade `div[data-contents='true']`
+  y `PHOTO_INPUT` el input de archivos del composer de escritorio.
+- **Confirmación de post en el muro sin URL nueva**: en muchos casos Facebook
+  inserta el post en el feed sin navegar a una URL `story.php`/`permalink.php`.
+  `_confirm_new_post()` con `text=` confirma por el texto presente en el DOM y
+  el diálogo del composer **cerrado**; `post_id` puede quedar en `None` y
+  `post_url` en la URL de la página actual.
+- **Timeouts generosos para redes lentas**: `COMPOSER_OPEN_TIMEOUT` (120 s) para
+  que el diálogo renderice tras abrirlo y `SUBMIT_TIMEOUT` (60 s) para esperar
+  que el botón **Publicar** se habilite (quita `aria-disabled`). No dependen de
+  `confirm_timeout`.
+- **Composer falso del perfil**: el perfil de escritorio tiene un
+  `contenteditable` colapsado **siempre visible** que no es el diálogo real.
+  `_open_composer()` solo lo considera abierto cuando coexisten el campo
+  editable y el botón Publicar.
+- **`post_url` canónico y `text` persistido**: el resultado guardado ahora
+  registra el `text` del post (antes quedaba `null`). Y el `post_url` ya no es
+  el primer enlace "nuevo" del DOM (que podía ser un post de grupo o una
+  notificación ajena): con `text=` se busca el permalink **junto al texto** en
+  el feed, se descartan los enlaces de grupos/otras personas (filtrando por el
+  `id=` del `c_user` en curso) y se limpian los parámetros de tracking
+  (`notif_*`, `ref=`). Si no se encuentra un permalink del propio usuario, se
+  guarda la URL de la página actual con `post_id=None`.
+
+### Correcciones
+
+- **`find_config_file()` capturaba el cwd en el import**: `DEFAULT_CONFIG_PATHS`
+  se computaba al cargar el módulo, así que
+  `AccountManager()` / `build_storage()` podían ignorar un `reaper.toml`
+  creado o cambiado después del import, y los tests que aislaban el cwd fallaban.
+  Ahora las rutas se evalúan en cada búsqueda.
+
+### Compatibilidad
+
+- Cambios aditivos. La navegación al perfil deriva `c_user`; si la cuenta no
+  tiene ese cookie (o el perfil no se puede resolver), cae al home como antes.
+
+---
+
+## 0.3.0
+
+### Nuevas funcionalidades
+
+- **Acciones de escritura autenticadas** (`reaper.actions`):
+  - `ActionManager` — orquestador que ejecuta acciones contra una sesión de
+    Facebook autenticada y persiste cada resultado (`ActionResult`).
+  - `create_post()` — publicar texto y/o imágenes en el muro de la cuenta o
+    directamente dentro de un grupo (`group` por ID o URL).
+  - `share_post()` — compartir una publicación existente hacia un grupo
+    (búsqueda por `group_name` o `group`).
+  - `comment()` — responder con texto a una publicación.
+  - `like()` — reaccionar con "Me gusta" a una publicación.
+  - Confirmación por DOM (`confirm_timeout`) y estado `status="ok"` / `"error"`.
+  - Selección explícita de `account` por `account_id`, `username` o `c_user`;
+    `None` = rotación automática del `AccountManager`.
+  - `ActionResult` se persiste en el mismo backend que las cuentas
+    (local / PostgreSQL / MongoDB) pero en un recurso separado:
+    `actions_dir` / `actions_table` / `actions_collection` (defaults
+    `data/actions`, `actions`, `actions`).
+
+- **`SessionActor` / `SessionHandle`** (`reaper.actions.actor`):
+  - Lanzamiento de sesiones autenticadas con Camoufox, inyección de cookies y
+    exportación de cookies actualizadas post-ejecución.
+
+- **Storage de acciones** (`reaper.actions.storage`):
+  - `BaseActionStorage` (ABC), `LocalActionStorage`, `PostgresActionStorage`,
+    `MongoActionStorage` y `build_action_storage()`.
+  - Interfaz: `add`, `get`, `list_all`, `delete`, `count`.
+
+- **CLI de acciones** (`reaper action <verb>`):
+  - Subcomandos `post`, `share`, `comment` y `like`, con flags comunes
+    `--account`, `--no-headless`, `--proxy`, `--proxy-user`, `--proxy-pass`,
+    `--confirm-timeout`, `--output`, `--indent` y `--debug`.
+  - Códigos de salida: `0` confirmada, `1` ejecutada sin confirmar
+    (`status="error"`), `5` error de entrada/sesión (`ActionError`).
+
+### API modificada
+
+- `reaper` y `reaper.actions` exportan: `ActionManager`, `ActionType`,
+  `ActionResult`, `ActionError`, `SessionActor`, `SessionHandle`,
+  `BaseActionStorage`, los tres backends de acciones y `build_action_storage`.
+
+### Compatibilidad
+
+- Los cambios son **aditivos** y no rompen la API de scraping/autenticación
+  existente. El storage de acciones requiere que el `AccountManager` tenga al
+  menos una cuenta de Facebook autenticada con cookies válidas.
+
+---
+
 ## 0.2.4
 
 ### Nuevas funcionalidades

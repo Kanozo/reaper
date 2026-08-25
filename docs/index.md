@@ -1,14 +1,16 @@
 # Reaper
 
 > Librería Python para extraer datos estructurados de **Facebook** e **Instagram**.
-> Versión **0.2.3** — Python 3.11+
+> Versión **0.3.0** — Python 3.11+
 
 ---
 
 Reaper convierte URLs de redes sociales en diccionarios Python listos para procesar.
 Soporta posts, reels, vídeos, fotos, grupos y perfiles de Facebook, y posts y reels
 de Instagram. Desde la versión 0.2.0 también gestiona **sesiones autenticadas**
-con rotación inteligente de cuentas.
+con rotación inteligente de cuentas. Desde la versión 0.3.0 también incluye
+**acciones de escritura** (`ActionManager`): publicar posts (texto e imágenes),
+compartir a grupos, comentar y dar "Me gusta" desde una sesión autenticada.
 
 ## Instalación
 
@@ -58,6 +60,7 @@ asyncio.run(main())
 - Extraer posts, reels, vídeos, fotos, grupos y perfiles de Facebook.
 - Extraer posts y reels de Instagram.
 - Gestionar múltiples cuentas autenticadas con rotación inteligente.
+- Escribir acciones autenticadas: posts, comentarios, likes y compartir a grupos.
 - Almacenar cuentas y sesiones en local, PostgreSQL o MongoDB vía `reaper.toml`.
 - Trabajar con proxies para anonimidad o distribución geográfica.
 - Guardar artefactos de debug (HTML, tráfico GraphQL) para diagnóstico offline.
@@ -69,12 +72,15 @@ asyncio.run(main())
 - No automatiza el proceso de login (siempre es manual por diseño).
 - No garantiza funcionamiento si Facebook/Instagram cambia su estructura interna.
 - No gestiona CAPTCHAs visuales ni verificaciones de seguridad de plataforma.
+- Las acciones de escritura solo cubren Facebook (no Instagram) y requieren una
+  cuenta autenticada; no garantiza que los selectores de UI sigan funcionando
+  ante cambios del DOM.
 
 ## Estructura del proyecto
 
 ```
 src/reaper/
-├── __init__.py          API pública: scrape(), Reaper, AccountManager
+├── __init__.py          API pública: scrape(), Reaper, AccountManager, ActionManager
 ├── cli.py               Comando reaper en la terminal
 ├── config.py            ScraperConfig — objeto de configuración central
 ├── core.py              Reaper — orquestador principal
@@ -84,6 +90,12 @@ src/reaper/
 │   ├── rotator.py       Algoritmo de rotación por score
 │   ├── login.py         Flujo interactivo de login
 │   └── storage/         Backends de persistencia (local/PG/Mongo)
+├── actions/             Acciones de escritura autenticadas (v0.3.0)
+│   ├── manager.py       ActionManager — orquestador de posts/likes/comentarios
+│   ├── actor.py         SessionActor — sesiones autenticadas con Camoufox
+│   ├── models.py        ActionType, ActionResult, ActionError
+│   ├── facebook/        Flujos de UI y selectores por plataforma
+│   └── storage/         Persistencia de resultados de acciones (local/PG/Mongo)
 ├── network/             Playwright + captura de tráfico (ContentFetcher)
 ├── anti_detection/      Fingerprint, stealth JS y comportamiento humano
 ├── scrapers/            Orquestadores por plataforma

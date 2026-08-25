@@ -7,11 +7,12 @@ El usuario final elige el backend (``local``, ``postgres`` o ``mongodb``) en
 un fichero de configuración ``reaper.toml``. Todas las variables de conexión
 y parámetros de cada backend se leen de ahí; ningún valor queda hardcodeado.
 
-Formato del fichero::
+    Formato del fichero::
 
     [storage]
     backend = "postgres"            # local | postgres | mongodb
     accounts_dir = "data/accounts"  # solo se usa con backend="local"
+    actions_dir  = "data/actions"   # solo se usa con backend="local"
 
     [storage.postgres]
     dsn = "postgresql://user:pass@localhost:5432/reaper"
@@ -19,11 +20,19 @@ Formato del fichero::
     max_overflow = 10
     timeout = 30.0
     table = "accounts"
+    actions_table = "actions"
 
     [storage.mongodb]
     uri = "mongodb://localhost:27017"
     database = "reaper"
     collection = "accounts"
+    actions_collection = "actions"
+
+El subsistema de acciones (posts, comentarios, likes) reutiliza esta misma
+sección ``[storage]``: comparte backend, conexión y base de datos con las
+cuentas, pero persiste en una tabla/colección separada (por defecto
+``actions``). Los campos ``actions_dir``, ``actions_table`` y
+``actions_collection`` son opcionales y solo aplican al storage de acciones.
 
 Búsqueda del fichero (por orden):
     1. Ruta explícita pasada a :func:`load_storage_config`.
@@ -56,11 +65,13 @@ logger = get_logger(__name__)
 SUPPORTED_BACKENDS: frozenset[str] = frozenset({"local", "postgres", "mongodb"})
 
 # Rutas por defecto en las que buscar reaper.toml (en orden de precedencia).
-DEFAULT_CONFIG_PATHS: tuple[Path, ...] = (
-    Path.cwd() / "reaper.toml",
-    Path.home() / ".config" / "reaper" / "reaper.toml",
-    Path("/etc/reaper/reaper.toml"),
-)
+# Se evalúan en cada búsqueda para no capturar el cwd en el import.
+def _default_config_paths() -> tuple[Path, ...]:
+    return (
+        Path.cwd() / "reaper.toml",
+        Path.home() / ".config" / "reaper" / "reaper.toml",
+        Path("/etc/reaper/reaper.toml"),
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -79,6 +90,8 @@ class PostgresConfig:
         max_overflow: Conexiones extra bajo carga. Defecto: 10.
         timeout: Segundos de espera de conexión. Defecto: 30.0.
         table: Nombre de la tabla de cuentas. Defecto: ``"accounts"``.
+        actions_table: Nombre de la tabla de acciones de escritura.
+            Defecto: ``"actions"``.
     """
 
     dsn: str
@@ -86,6 +99,7 @@ class PostgresConfig:
     max_overflow: int = 10
     timeout: float = 30.0
     table: str = "accounts"
+    actions_table: str = "actions"
 
 
 @dataclass(frozen=True)
@@ -96,11 +110,14 @@ class MongoConfig:
         uri: Cadena de conexión, p.ej. ``"mongodb://localhost:27017"``.
         database: Nombre de la base de datos. Defecto: ``"reaper"``.
         collection: Nombre de la colección. Defecto: ``"accounts"``.
+        actions_collection: Nombre de la colección de acciones de escritura.
+            Defecto: ``"actions"``.
     """
 
     uri: str
     database: str = "reaper"
     collection: str = "accounts"
+    actions_collection: str = "actions"
 
 
 @dataclass(frozen=True)
@@ -112,12 +129,15 @@ class StorageConfig:
             Defecto: ``"local"`` (comportamiento original, JSON en disco).
         accounts_dir: Directorio raíz usado por ``LocalFileStorage``.
             Solo se aplica con ``backend="local"``. Defecto: ``"data/accounts"``.
+        actions_dir: Directorio raíz usado por ``LocalActionStorage``.
+            Solo se aplica con ``backend="local"``. Defecto: ``"data/actions"``.
         postgres: Parámetros del backend PostgreSQL (si se elige).
         mongodb: Parámetros del backend MongoDB (si se elige).
     """
 
     backend: str = "local"
     accounts_dir: str = "data/accounts"
+    actions_dir: str = "data/actions"
     postgres: PostgresConfig | None = None
     mongodb: MongoConfig | None = None
 
@@ -161,6 +181,7 @@ def load_storage_config(path: str | Path | None = None) -> StorageConfig:
         )
 
     accounts_dir = str(storage.get("accounts_dir", "data/accounts"))
+    actions_dir = str(storage.get("actions_dir", "data/actions"))
 
     postgres_cfg: PostgresConfig | None = None
     if backend == "postgres":
@@ -176,6 +197,7 @@ def load_storage_config(path: str | Path | None = None) -> StorageConfig:
             max_overflow=int(pg_section.get("max_overflow", 10)),
             timeout=float(pg_section.get("timeout", 30.0)),
             table=str(pg_section.get("table", "accounts")),
+            actions_table=str(pg_section.get("actions_table", "actions")),
         )
 
     mongo_cfg: MongoConfig | None = None
@@ -190,6 +212,9 @@ def load_storage_config(path: str | Path | None = None) -> StorageConfig:
             uri=str(mongo_section["uri"]),
             database=str(mongo_section.get("database", "reaper")),
             collection=str(mongo_section.get("collection", "accounts")),
+            actions_collection=str(
+                mongo_section.get("actions_collection", "actions")
+            ),
         )
 
     logger.debug(
@@ -200,6 +225,7 @@ def load_storage_config(path: str | Path | None = None) -> StorageConfig:
     return StorageConfig(
         backend=backend,
         accounts_dir=accounts_dir,
+        actions_dir=actions_dir,
         postgres=postgres_cfg,
         mongodb=mongo_cfg,
     )
@@ -276,7 +302,7 @@ def find_config_file(path: str | Path | None = None) -> Path | None:
         env_path = os.environ.get("REAPER_CONFIG")
         if env_path:
             candidates.append(Path(env_path))
-        candidates.extend(DEFAULT_CONFIG_PATHS)
+        candidates.extend(_default_config_paths())
 
     for candidate in candidates:
         if candidate.is_file():

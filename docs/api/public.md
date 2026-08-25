@@ -17,6 +17,11 @@ from reaper import (
     BaseAccountStorage,
     LocalFileStorage,
     StorageError,
+    ActionManager,
+    ActionType,
+    ActionResult,
+    ActionError,
+    build_action_storage,
 )
 ```
 
@@ -39,3 +44,20 @@ from reaper import (
 ::: reaper.core.ScrapingError
 
 ::: reaper.core.UnsupportedPlatformError
+
+---
+
+## Acciones de escritura
+
+Símbolos de `reaper.actions` re-exportados desde el paquete raíz `reaper`.
+Ver [API Reference — reaper.actions](actions.md) para la referencia completa.
+
+::: reaper.actions.ActionManager
+
+::: reaper.actions.ActionResult
+
+::: reaper.actions.ActionType
+
+::: reaper.actions.ActionError
+
+::: reaper.actions.build_action_storage

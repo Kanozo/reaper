@@ -29,7 +29,7 @@ Ejemplo de uso::
         account_id="uuid-1234",
         platform="facebook",
         username="mi_usuario",
-        email="user@example.com",
+        name="Mi Usuario",
     )
     perfil.activity.record_success()
     print(perfil.status)          # AccountStatus.UNKNOWN
@@ -267,10 +267,21 @@ class AccountProfile:
                     si no se especifica.
         platform:   ``"facebook"`` o ``"instagram"``.
         username:   Nombre de usuario o identificador legible de la cuenta.
-        email:      Email asociado a la cuenta (opcional, no se usa para auth).
+        name:       Nombre público del perfil (ej. "Kanozo Gonzalez").
+        avatar:     Contenido del avatar en base64 (binario), o None
+                    si todavía no se ha capturado el perfil.
+        description: Breve descripción del perfil (de ``best_description``).
+        biography:  Biografía completa del perfil. Coincide con ``description``
+                    en el origen actual de los datos.
+        followers_count: Personas que siguen el perfil.
+        following_count: Perfiles que sigue este usuario.
+        friends_count:   Número de amigos del perfil.
         status:     Estado operativo. Ver ``AccountStatus``.
         cookies_path: Ruta absoluta al archivo de cookies JSON en formato
                       Playwright. ``None`` si todavía no se han importado cookies.
+        password:   Contraseña de la cuenta (texto plano). Usada para
+                    autenticaciones donde las cookies no son suficientes.
+                    ``None`` si no se ha registrado.
         activity:   Historial de actividad. Se crea vacío por defecto.
         created_at: ISO-8601 de creación del perfil.
         updated_at: ISO-8601 de la última modificación.
@@ -284,7 +295,15 @@ class AccountProfile:
     account_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     platform: str = "facebook"
     username: str = ""
-    email: str | None = None
+    name: str = ""
+    avatar: str | None = None
+
+    # ── Perfil social ─────────────────────────────────────────────────────────
+    description: str = ""
+    biography: str = ""
+    followers_count: int = 0
+    following_count: int = 0
+    friends_count: int = 0
 
     # ── Estado ───────────────────────────────────────────────────────────────
     status: AccountStatus = AccountStatus.UNKNOWN
@@ -293,6 +312,11 @@ class AccountProfile:
     # Ruta al archivo cookies.json (formato Playwright) en disco.
     # None = todavía no se han importado cookies para esta cuenta.
     cookies_path: str | None = None
+
+    # ── Credenciales ──────────────────────────────────────────────────────────
+    # Contraseña de la cuenta en texto plano. Útil para flujos donde se
+    # requiera autenticación directa (además de las cookies).
+    password: str | None = None
 
     # ── Actividad ─────────────────────────────────────────────────────────────
     activity: AccountActivity = field(default_factory=AccountActivity)
@@ -352,9 +376,16 @@ class AccountProfile:
             "account_id": self.account_id,
             "platform": self.platform,
             "username": self.username,
-            "email": self.email,
+            "name": self.name,
+            "avatar": self.avatar,
+            "description": self.description,
+            "biography": self.biography,
+            "followers_count": self.followers_count,
+            "following_count": self.following_count,
+            "friends_count": self.friends_count,
             "status": self.status.value,  # str, no el Enum
             "cookies_path": self.cookies_path,
+            "password": self.password,
             "activity": self.activity.to_dict(),
             "created_at": self.created_at,
             "updated_at": self.updated_at,
@@ -386,9 +417,16 @@ class AccountProfile:
             account_id=data.get("account_id", str(uuid.uuid4())),
             platform=data.get("platform", "facebook"),
             username=data.get("username", ""),
-            email=data.get("email"),
+            name=data.get("name", ""),
+            avatar=data.get("avatar"),
+            description=data.get("description", ""),
+            biography=data.get("biography", ""),
+            followers_count=data.get("followers_count", 0),
+            following_count=data.get("following_count", 0),
+            friends_count=data.get("friends_count", 0),
             status=status,
             cookies_path=data.get("cookies_path"),
+            password=data.get("password"),
             activity=AccountActivity.from_dict(activity_data),
             created_at=data.get("created_at", _now_iso()),
             updated_at=data.get("updated_at", _now_iso()),

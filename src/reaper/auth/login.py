@@ -63,14 +63,19 @@ Uso programático::
 from __future__ import annotations
 
 import asyncio
+import base64
+import random
+import re
 import sys
-from pathlib import Path
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, cast
 
-from playwright.async_api import BrowserContext, Page, async_playwright
+from camoufox.async_api import AsyncCamoufox
+from playwright.async_api import BrowserContext, Page
 
 from reaper.auth.account_manager import AccountManager
 from reaper.auth.models import AccountProfile, AccountStatus
+from reaper.parsers.facebook.profile_parser import ProfileParser
 from reaper.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -116,6 +121,29 @@ PROGRESS_REPORT_INTERVAL: int = 30
 BROWSER_VIEWPORT: dict[str, int] = {"width": 1280, "height": 800}
 
 
+@dataclass
+class LoginSessionData:
+    """Datos capturados durante una sesión de login interactivo.
+
+    Attributes:
+        cookies:      Lista de dicts de cookies (formato Playwright).
+        profile:      Resultado del ``ProfileParser`` sobre la página de
+                      perfil post-login, o ``None`` si no se pudo capturar.
+        avatar_base64: Avatar del usuario en base64 (binario), o ``None``
+                      si no se pudo descargar.
+        error:        Mensaje de error si el login no se completó.
+    """
+
+    cookies: list[dict[str, Any]]
+    profile: dict[str, Any] | None = None
+    avatar_base64: str | None = None
+    error: str | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.error is None and bool(self.cookies)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Sección 1: API programática pública
 # ─────────────────────────────────────────────────────────────────────────────
@@ -125,8 +153,8 @@ async def run_login_new_account(
     manager: AccountManager,
     platform: str,
     username: str,
-    email: str | None = None,
     notes: str = "",
+    password: str | None = None,
 ) -> AccountProfile | None:
     """Flujo completo de login para registrar una cuenta nueva.
 
@@ -135,6 +163,10 @@ async def run_login_new_account(
     de añadir una cuenta cuando el operador también va a hacer el login
     en el mismo momento.
 
+    Tras completar el login, se navega a la página de perfil del usuario
+    para capturar con ``ProfileParser`` los datos sociales (nombre, bio,
+    seguidores, seguidos, amigos) y descargar el avatar en base64.
+
     Si prefieres registrar la cuenta primero y hacer el login más tarde,
     usa ``manager.add_account()`` y después ``run_login_refresh()``.
 
@@ -142,8 +174,10 @@ async def run_login_new_account(
         manager:  Instancia de ``AccountManager`` donde se registrará la cuenta.
         platform: ``"facebook"`` o ``"instagram"``.
         username: Nombre de usuario o email de la cuenta (solo informativo).
-        email:    Email asociado a la cuenta (opcional, solo informativo).
         notes:    Notas libres para identificar la cuenta.
+        password: Contraseña de la cuenta (texto plano), o ``None``. Se
+                  persiste junto al perfil para reutilizarla en flujos
+                  que requieran autenticación directa.
 
     Returns:
         ``AccountProfile`` registrado y con cookies importadas,
@@ -156,34 +190,52 @@ async def run_login_new_account(
 
     _print_login_header(platform, username, mode="new")
 
-    # Capturar cookies mediante el flujo interactivo.
-    cookies = await _run_browser_login_flow(platform)
+    # Capturar cookies y datos de perfil mediante el flujo interactivo.
+    session = await _run_browser_login_flow(platform)
 
-    if not cookies:
-        _print_error("No se obtuvieron cookies. El login no fue completado.")
+    if not session.ok:
+        _print_error(session.error or "No se obtuvieron cookies. El login no fue completado.")
         return None
+
+    # Extraer datos del perfil capturado (si está disponible).
+    profile_data = session.profile or {}
+    name = profile_data.get("name") or username
+    description = profile_data.get("bio") or ""
+    biography = profile_data.get("bio") or ""
 
     # Crear la cuenta en el AccountManager con las cookies recién capturadas.
     try:
         profile = await manager.add_account(
             platform=platform,
             username=username,
-            email=email,
+            name=name,
+            avatar=session.avatar_base64,
+            description=description,
+            biography=biography,
+            followers_count=profile_data.get("followers_count", 0),
+            following_count=profile_data.get("following_count", 0),
+            friends_count=profile_data.get("friends_count", 0),
+            password=password,
             notes=notes,
-            cookies=cookies,
+            cookies=session.cookies,
         )
         _print_success(
             f"Cuenta registrada y sesión guardada.\n"
             f"   account_id : {profile.account_id}\n"
             f"   platform   : {profile.platform}\n"
             f"   username   : {profile.username}\n"
-            f"   cookies    : {len(cookies)}\n"
+            f"   name       : {profile.name}\n"
+            f"   cookies    : {len(session.cookies)}\n"
             f"   estado     : {profile.status.value}"
         )
         logger.info(
             "Cuenta nueva registrada vía login | account_id=%s | platform=%s | "
-            "username=%s | cookies=%d",
-            profile.account_id, platform, username, len(cookies),
+            "username=%s | name=%s | cookies=%d | followers=%d | following=%d | "
+            "friends=%d | avatar=%s",
+            profile.account_id, platform, username, profile.name,
+            len(session.cookies), profile.followers_count,
+            profile.following_count, profile.friends_count,
+            "si" if profile.avatar else "no",
         )
         return profile
 
@@ -234,28 +286,28 @@ async def run_login_refresh(
         current_status=profile.status,
     )
 
-    # Capturar cookies mediante el flujo interactivo.
-    cookies = await _run_browser_login_flow(profile.platform)
+    # Capturar cookies y datos de perfil mediante el flujo interactivo.
+    session = await _run_browser_login_flow(profile.platform)
 
-    if not cookies:
-        _print_error("No se obtuvieron cookies. El refresco no fue completado.")
+    if not session.ok:
+        _print_error(session.error or "No se obtuvieron cookies. El refresco no fue completado.")
         return False
 
     # Reemplazar cookies en el AccountManager.
     try:
-        ok = await manager.import_cookies(account_id, cookies)
+        ok = await manager.import_cookies(account_id, session.cookies)
         if ok:
             _print_success(
                 f"Cookies refrescadas correctamente.\n"
                 f"   account_id : {account_id}\n"
                 f"   username   : {profile.username}\n"
-                f"   cookies    : {len(cookies)}\n"
+                f"   cookies    : {len(session.cookies)}\n"
                 f"   nuevo estado: active"
             )
             logger.info(
                 "Cookies refrescadas vía login | account_id=%s | username=%s | "
                 "cookies=%d",
-                account_id, profile.username, len(cookies),
+                account_id, profile.username, len(session.cookies),
             )
         return ok
 
@@ -274,31 +326,43 @@ async def run_login_refresh(
 
 async def _run_browser_login_flow(
     platform: str,
-) -> list[dict[str, Any]] | None:
-    """Abre Firefox, espera el login manual y devuelve las cookies capturadas.
+) -> LoginSessionData:
+    """Abre Firefox, espera el login manual y captura cookies + perfil.
 
     Esta función encapsula toda la interacción con Playwright. Es independiente
-    del ``AccountManager`` — solo devuelve cookies brutas. El llamador decide
-    qué hacer con ellas.
+    del ``AccountManager`` — solo devuelve cookies crudas y datos de perfil.
+    El llamador decide qué hacer con ellos.
+
+    Tras detectar el login exitoso, navega a la página de perfil del usuario
+    y la parsea con ``ProfileParser`` para obtener nombre, bio, seguidores,
+    seguidos y amigos; también descarga el avatar como base64.
 
     Args:
         platform: ``"facebook"`` o ``"instagram"``.
 
     Returns:
-        Lista de dicts de cookies en formato Playwright, o ``None`` si falló.
+        ``LoginSessionData`` con cookies y (si fue posible) el perfil capturado.
+        ``error`` no es ``None`` si el flujo falló.
     """
     login_url = LOGIN_URLS[platform]
 
-    try:
-        async with async_playwright() as pw:
-            # ── Lanzar Firefox visible ────────────────────────────────────────
-            # headless=False es obligatorio: el usuario debe poder interactuar
-            # con el navegador para completar el login manualmente.
-            browser = await pw.firefox.launch(
-                headless=False,
-                args=["--no-sandbox"],
-            )
+    # Se almacena el resultado en una variable en lugar de hacer ``return``
+    # dentro del ``async with``: si la conexión con el driver muere (bug de
+    # Playwright con pageError), el ``browser.close()`` del ``__aexit__``
+    # puede lanzar y descartaría un login ya completado.
+    result: LoginSessionData | None = None
 
+    try:
+        # ── Lanzar Camoufox visible ─────────────────────────────────────────
+        # Camoufox tiene su propio launcher (NO usar async_playwright):
+        # usa un Firefox modificado anti-detección con su propio build.
+        # headless=False es obligatorio: el usuario debe poder interactuar
+        # con el navegador para completar el login manualmente.
+        async with AsyncCamoufox(
+            headless=False,
+            humanize=True,  # Simula comportamiento humano
+            os=random.choice(["windows", "macos", "linux"]),  # OS aleatorio
+        ) as browser:
             context: BrowserContext = await browser.new_context(
                 viewport=BROWSER_VIEWPORT,
                 locale="en-US",
@@ -316,42 +380,260 @@ async def _run_browser_login_flow(
             login_completed = await _wait_for_login_success(page, platform)
 
             if not login_completed:
-                print(
-                    f"\n   Tiempo de espera agotado "
-                    f"({LOGIN_TIMEOUT_SECONDS // 60} min) sin detectar login exitoso."
+                result = LoginSessionData(
+                    cookies=[],
+                    error=(
+                        f"Tiempo de espera agotado "
+                        f"({LOGIN_TIMEOUT_SECONDS // 60} min) sin detectar login exitoso."
+                    ),
                 )
-                await browser.close()
-                return None
+            else:
+                # ── Extraer cookies del contexto ──────────────────────────────
+                # Se obtienen del contexto (no de la página) para incluir todas
+                # las cookies de todos los dominios de la sesión.
+                cookies: list[dict[str, Any]] = await context.cookies()
 
-            # ── Extraer cookies del contexto ──────────────────────────────────
-            # Se obtienen del contexto (no de la página) para incluir todas
-            # las cookies de todos los dominios de la sesión.
-            cookies: list[dict[str, Any]] = await context.cookies()
+                if not cookies:
+                    result = LoginSessionData(
+                        cookies=[],
+                        error="No se encontraron cookies en la sesión.",
+                    )
+                else:
+                    print(f"\n   {len(cookies)} cookies capturadas.")
 
-            if not cookies:
-                print("\n   No se encontraron cookies en la sesión.")
-                await browser.close()
-                return None
+                    # ── Capturar perfil del usuario + avatar ─────────────────
+                    profile_data, avatar_base64 = await _capture_profile(
+                        context, page, platform
+                    )
+                    if profile_data:
+                        print(
+                            f"   Perfil capturado: {profile_data.get('name', '')} | "
+                            f"seguidores={profile_data.get('followers_count', 0)} | "
+                            f"seguidos={profile_data.get('following_count', 0)} | "
+                            f"amigos={profile_data.get('friends_count', 0)}"
+                        )
+                    if avatar_base64:
+                        print(f"   Avatar descargado ({len(avatar_base64) // 1024} KB).")
 
-            print(f"\n   {len(cookies)} cookies capturadas.")
+                    # Breve pausa para que el usuario vea el mensaje de éxito
+                    # en pantalla antes de que el navegador se cierre solo.
+                    await asyncio.sleep(2)
 
-            # Breve pausa para que el usuario vea el mensaje de éxito en pantalla
-            # antes de que el navegador se cierre automáticamente.
-            await asyncio.sleep(2)
-            await browser.close()
-
-            return cookies
+                    result = LoginSessionData(
+                        cookies=cookies,
+                        profile=profile_data,
+                        avatar_base64=avatar_base64,
+                    )
 
     except KeyboardInterrupt:
         # El usuario canceló con Ctrl+C mientras el navegador estaba abierto.
         print("\n\n   Login cancelado por el usuario.")
         logger.info("Login cancelado por el usuario (KeyboardInterrupt)")
-        return None
+        return LoginSessionData(cookies=[], error="Login cancelado por el usuario.")
 
     except Exception as exc:
-        _print_error(f"Error inesperado durante el flujo de login: {exc}")
-        logger.exception("Error inesperado en _run_browser_login_flow | platform=%s", platform)
+        # Si ya había un resultado (login completado), un error al cerrar el
+        # navegador no debe descartar la sesión capturada.
+        if result is not None:
+            logger.warning(
+                "Login completado pero hubo un error al cerrar el navegador: %s",
+                exc,
+            )
+        else:
+            _print_error(f"Error inesperado durante el flujo de login: {exc}")
+            logger.exception("Error inesperado en _run_browser_login_flow | platform=%s", platform)
+            return LoginSessionData(cookies=[], error=str(exc))
+
+    if result is None:
+        return LoginSessionData(cookies=[], error="El flujo de login no produjo un resultado.")
+    return result
+
+
+async def _capture_profile(
+    context: BrowserContext,
+    page: Page,
+    platform: str,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Captura el perfil del usuario recién autenticado y su avatar.
+
+    Navega a la página de perfil del usuario logueado, extrae su HTML
+    renderizado y lo parsea con ``ProfileParser`` para obtener los datos
+    sociales. Después descarga el avatar (URL del parser) y lo codifica
+    en base64 para persistirlo junto a la cuenta.
+
+    Facebook: navega a ``facebook.com/me`` (redirige al perfil del usuario).
+    Instagram: usa ``instagram.com/{username}`` cuando se conoce el username.
+
+    Args:
+        context: Contexto del navegador con la sesión autenticada.
+        page:    Página activa de Playwright.
+        platform: ``"facebook"`` o ``"instagram"``.
+
+    Returns:
+        Tupla ``(profile_data, avatar_base64)``. ``profile_data`` es el
+        dict del ``ProfileParser`` (o ``None`` si falló); ``avatar_base64``
+        es el avatar en base64 (o ``None`` si no se pudo descargar).
+    """
+    try:
+        if platform == "facebook":
+            # Si ya estamos en una página de perfil (p.ej. tras el login la
+            # URL es profile.php?id=...), capturar directamente SIN navegar.
+            # Navegar a /me dispara un bug del driver de Playwright/Camoufox
+            # (pageError con location undefined) que mata la conexión.
+            if not _is_fb_profile_url(page.url):
+                await page.goto(
+                    "https://www.facebook.com/me", wait_until="domcontentloaded"
+                )
+                await page.wait_for_timeout(2500)
+        else:
+            # Instagram: intentar con /accounts/edit o capturar desde la página actual.
+            try:
+                username = await _extract_username_from_url(page.url)
+                if username:
+                    await page.goto(
+                        f"https://www.instagram.com/{username}/",
+                        wait_until="domcontentloaded",
+                    )
+                    await page.wait_for_timeout(2500)
+            except Exception:
+                return None, None
+
+        html_content = await page.content()
+        final_url = page.url
+
+        parser = ProfileParser(
+            html_content=html_content,
+            final_url=final_url,
+            original_url=final_url,
+        )
+        profile_data = parser.parse()
+
+        # Descargar avatar desde la URL capturada por el parser.
+        # El fallo de la descarga NO debe descartar el perfil completo:
+        # se intenta con un timeout corto y fallbacks, y en el peor caso
+        # se devuelve el perfil con avatar=None.
+        avatar_url = profile_data.get("avatar") or ""
+        avatar_base64 = await _download_avatar(page, context, avatar_url)
+
+        return profile_data, avatar_base64
+
+    except Exception as exc:
+        logger.warning("No se pudo capturar el perfil post-login: %s", exc)
+        return None, None
+
+
+async def _download_avatar(
+    page: Page,
+    context: BrowserContext,
+    avatar_url: str,
+) -> str | None:
+    """Descarga el avatar y lo devuelve en base64 (o ``None`` si falla).
+
+    Intentos en orden:
+    1. ``context.request.get`` (10s de timeout) — rápido, pero puede fallar
+       si el CDN de Facebook exige cookies/referer de la sesión.
+    2. ``fetch`` dentro de la página (15s) — hereda cookies, headers y
+       referer del navegador, por lo que es el método más fiable.
+    3. Página temporal con ``await page.goto(avatar_url)`` — último recurso.
+
+    Args:
+        page:       Página activa (con la sesión autenticada).
+        context:    Contexto del navegador.
+        avatar_url: URL del avatar a descargar.
+
+    Returns:
+        Avatar codificado en base64, o ``None`` si no se pudo descargar.
+    """
+    if not avatar_url:
         return None
+
+    # 1) APIRequestContext del contexto
+    try:
+        response = await context.request.get(avatar_url, timeout=10_000)
+        if response.ok:
+            data = await response.body()
+            return base64.b64encode(data).decode("ascii")
+    except Exception as exc:
+        logger.debug("Avatar vía context.request falló: %s", exc)
+
+    # 2) fetch dentro de la página (hereda cookies/referer de la sesión)
+    try:
+        b64 = cast(
+            str | None,
+            await page.evaluate(
+                """async (url) => {
+                    const res = await fetch(url, { credentials: 'include' });
+                    if (!res.ok) return null;
+                    const buf = await res.arrayBuffer();
+                    let bin = '';
+                    const bytes = new Uint8Array(buf);
+                    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+                    return btoa(bin);
+                }""",
+                avatar_url,
+            ),
+        )
+        if b64:
+            return b64
+    except Exception as exc:
+        logger.debug("Avatar vía fetch in-page falló: %s", exc)
+
+    # 3) Navegar a la URL de la imagen (hereda cookies/referer) y usar
+    #    la response del goto directamente.
+    try:
+        new_page = await context.new_page()
+        try:
+            img_response = await new_page.goto(avatar_url, timeout=15_000)
+            if img_response and img_response.ok:
+                body = await img_response.body()
+                if body:
+                    return base64.b64encode(body).decode("ascii")
+        finally:
+            await new_page.close()
+    except Exception as exc:
+        logger.warning("Avatar vía página temporal falló: %s", exc)
+
+    return None
+
+
+def _is_fb_profile_url(url: str) -> bool:
+    """Indica si la URL ya es la página de perfil de un usuario de Facebook.
+
+    Evita navegar a ``/me`` cuando tras el login ya estamos en el perfil
+    (p. ej. ``profile.php?id=...``). Navegar de nuevo dispara un bug del
+    driver de Playwright/Camoufox (``pageError`` con ``location`` undefined)
+    que corta la conexión con el navegador.
+
+    Args:
+        url: URL actual del navegador.
+
+    Returns:
+        ``True`` si la URL es un perfil personal de Facebook.
+    """
+    if "profile.php?id=" in url:
+        return True
+    if "facebook.com/me" in url:
+        return True
+    # Vanity URL (p. ej. https://www.facebook.com/zurdobo7 o
+    # https://www.facebook.com/EstefaniaQuesada91/) — último segmento
+    # de la ruta (con barra final opcional) que no sea una sección
+    # reservada de la plataforma.
+    match = re.search(r"facebook\.com/([^/?#]+)/?(?:[?#]|$)", url)
+    if not match:
+        return False
+    slug = match.group(1).lower()
+    reserved = {
+        "login", "home", "feed", "watch", "messages", "notifications",
+        "friends", "groups", "marketplace", "pages", "events", "reels",
+        "settings", "help", "search", "profile.php", "stories", "saved",
+    }
+    return slug not in reserved
+
+
+async def _extract_username_from_url(url: str) -> str | None:
+    """Extrae el username de una URL de Instagram (o None)."""
+    match = re.search(r"instagram\.com/([^/?#]+)", url)
+    return match.group(1) if match else None
 
 
 async def _wait_for_login_success(
@@ -381,7 +663,14 @@ async def _wait_for_login_success(
         current_url = page.url
 
         # Comprobar si la URL actual contiene algún patrón de éxito.
-        if any(pattern in current_url for pattern in patterns):
+        matched = any(pattern in current_url for pattern in patterns)
+        # Facebook: además de los patrones fijos, detectar perfiles con
+        # vanity URL (p. ej. /EstefaniaQuesada91) o /profile.php?id=...,
+        # que indican que el login redirigió al perfil del usuario.
+        if not matched and platform == "facebook":
+            matched = _is_fb_profile_url(current_url)
+
+        if matched:
             print(f"   Login completado. URL detectada: {current_url[:80]}")
             return True
 
