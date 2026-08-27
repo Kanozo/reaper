@@ -7,13 +7,14 @@ Cada función es ``async`` para integrarse directamente con Playwright.
 Los parámetros de timing siguen distribuciones estadísticas (Gauss, exponencial)
 en lugar de ``random.uniform`` puro, que produce patrones demasiado uniformes.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import math
 import random
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from playwright.async_api import Page
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 # Delays
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def human_delay(min_seconds: float = 2.0, max_seconds: float = 7.0) -> None:
     """
@@ -65,6 +67,7 @@ async def micro_delay(min_ms: int = 50, max_ms: int = 350) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # Movimiento de ratón
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _bezier_points(
     start: tuple[float, float],
@@ -140,6 +143,7 @@ async def human_move_to(page: Page, target_x: float, target_y: float) -> None:
 # Click y escritura
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 async def human_click(
     page: Page,
     selector: str,
@@ -197,12 +201,32 @@ async def human_type(
     element = page.locator(selector).first
     await element.wait_for(state="visible", timeout=8_000)
     await human_click(page, selector)
-    # Los editores lexical de Facebook requieren foco explícito: el click
-    # humano no siempre coloca el caret (el diálogo puede estar animándose).
+    await human_type_locator(page, element, text, clear_first=clear_first, wpm=wpm)
+
+
+async def human_type_locator(
+    page: Page,
+    locator: Any,
+    text: str,
+    clear_first: bool = False,
+    wpm: int | None = None,
+) -> None:
+    """Variante de :func:`human_type` que escribe en un ``Locator`` dado.
+
+    Útil cuando el campo ya está resuelto dentro de un contenedor
+    (p. ej. el composer inline de un artículo del feed).
+
+    Args:
+        page:        Página de Playwright activa (para el teclado global).
+        locator:     Locator del campo de texto destino.
+        text:        Texto a escribir.
+        clear_first: Si True, limpia el campo antes de escribir.
+        wpm:         Palabras por minuto objetivo. Si None, elige entre 60-120.
+    """
     try:
-        await element.focus()
+        await locator.focus()
     except Exception as _exc:  # pragma: no cover
-        logger.debug("human_type: focus fallido (%s)", _exc)
+        logger.debug("human_type_locator: focus fallido (%s)", _exc)
 
     if clear_first:
         await page.keyboard.press("Control+a")
@@ -210,26 +234,39 @@ async def human_type(
         await page.keyboard.press("Delete")
         await asyncio.sleep(0.1)
 
+    await _type_chars(page, text, wpm=wpm)
+
+
+async def human_type_focused(
+    page: Page,
+    text: str,
+    wpm: int | None = None,
+) -> None:
+    """Escribe con ritmo humano en el elemento que tenga el foco.
+
+    Útil cuando Facebook abre el composer ya enfocado (p. ej. tras pulsar
+    "Responder" en un feed) y localizar el campo sería redundante/frágil.
+    """
+    await _type_chars(page, text, wpm=wpm)
+
+
+async def _type_chars(page: Page, text: str, *, wpm: int | None = None) -> None:
+    """Bucle compartido de tipeo humano caracter a caracter."""
     target_wpm = wpm or random.randint(65, 115)
-    # Delay base por caracter (asumiendo 5 chars/palabra)
     base_delay = 60.0 / (target_wpm * 5)
 
     for char in text:
-        # Simular error tipográfico (2% de probabilidad)
         if random.random() < 0.02:
             typo_char = random.choice("qwertyuiopasdfghjklzxcvbnm")
             await page.keyboard.type(typo_char)
-            # Pausa de "me di cuenta del error"
             await asyncio.sleep(random.uniform(0.12, 0.35))
             await page.keyboard.press("Backspace")
             await asyncio.sleep(random.uniform(0.05, 0.15))
 
         await page.keyboard.type(char)
 
-        # Los espacios y puntuación tienen pausas más largas (pensamiento)
         if char in " .,;:!?\n\t":
             multiplier = random.uniform(1.3, 2.2)
-        # Teclas de desplazamiento (mayúsculas) son más lentas
         elif char.isupper():
             multiplier = random.uniform(1.1, 1.6)
         else:
@@ -241,6 +278,7 @@ async def human_type(
 # ─────────────────────────────────────────────────────────────────────────────
 # Scroll
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def human_scroll(
     page: Page,
@@ -302,6 +340,7 @@ async def human_scroll_to_element(page: Page, selector: str) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # Comportamiento idle y distracción
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 async def simulate_idle(page: Page, duration_seconds: float = 2.0) -> None:
     """
@@ -365,10 +404,12 @@ async def simulate_distraction(page: Page) -> None:
     viewport = page.viewport_size or {"width": 1280, "height": 800}
     # Ir a la esquina o al borde de la pantalla
     distraction_spots = [
-        (random.uniform(10, 50), random.uniform(10, 50)),          # esquina superior
-        (random.uniform(viewport["width"] - 50, viewport["width"] - 10),
-         random.uniform(10, 50)),                                    # esquina superior derecha
-        (viewport["width"] // 2, random.uniform(5, 20)),           # borde superior
+        (random.uniform(10, 50), random.uniform(10, 50)),  # esquina superior
+        (
+            random.uniform(viewport["width"] - 50, viewport["width"] - 10),
+            random.uniform(10, 50),
+        ),  # esquina superior derecha
+        (viewport["width"] // 2, random.uniform(5, 20)),  # borde superior
     ]
     spot_x, spot_y = random.choice(distraction_spots)
     await page.mouse.move(spot_x, spot_y)

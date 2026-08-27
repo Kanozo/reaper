@@ -26,6 +26,7 @@ Reglas de clasificación (en orden de evaluación)::
     share/v/<id>                                → ReelParser
     share/<id>  (sin sufijo)                    → PostParser
     /people/<nombre>/<id_numerico>/             → ProfileParser
+    /search/...                                 → SearchParser
     /<vanity>  (slug sin prefijos conocidos)    → ProfileParser
     Cualquier otro caso                         → UnknownParser
 
@@ -78,11 +79,13 @@ def get_parser_from_fb_url(url: str) -> str:
         Nombre de la clase de parser:
         ``"PostParser"``, ``"ReelParser"``, ``"VideoParser"``,
         ``"GroupParser"``, ``"ProfileParser"``, ``"PhotoParser"``,
-        ``"HashtagParser"``, ``"UnknownParser"``.
+        ``"HashtagParser"``, ``"SearchParser"``, ``"UnknownParser"``.
 
     Examples:
         >>> get_parser_from_fb_url("https://www.facebook.com/reel/816043001524221")
         'ReelParser'
+        >>> get_parser_from_fb_url("https://www.facebook.com/search/posts?q=cuba")
+        'SearchParser'
         >>> get_parser_from_fb_url("https://www.facebook.com/photo.php?fbid=861685686929188")
         'PhotoParser'
         >>> get_parser_from_fb_url("https://www.facebook.com/permalink.php?story_fbid=pfbid035&id=123")
@@ -178,6 +181,13 @@ def get_parser_from_fb_url(url: str) -> str:
     if re.match(r"^/people/[^/]+/\d+/?$", path, re.I):
         return "ProfileParser"
 
+    # ── Regla 14b: Búsqueda (/search/posts, /search/top, ...) ────────────────
+    # Debe evaluarse ANTES de la vanity URL. "search" ya está en _RESERVED,
+    # pero la ruta puede traer subrutas (p.ej. /search/posts?q=...) que la
+    # Regla 15 no captura; esta regla las clasifica explícitamente.
+    if re.match(r"^/search(?:/|$)", path, re.I):
+        return "SearchParser"
+
     # ── Regla 15: Vanity URL (/<slug>) ───────────────────────────────────────
     # Captura cualquier /<slug> que no haya sido reconocido antes.
     # IMPORTANTE: photo.php y video.php están en _RESERVED para que
@@ -213,5 +223,5 @@ def _normalize_url(url: str) -> tuple[str, str]:
         return parsed.path or "/", urlencode(clean, doseq=True)
     except Exception:
         return "/", ""
-    
+
 #print (get_parser_from_fb_url("https://www.facebook.com/profile.php?id=100079458018484"))

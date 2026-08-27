@@ -124,8 +124,7 @@ class SessionActor:
         self._fingerprint: Any | None = None
 
         logger.debug(
-            "SessionActor inicializado | headless=%s | browser_type=%s | "
-            "proxy=%s",
+            "SessionActor inicializado | headless=%s | browser_type=%s | proxy=%s",
             headless,
             browser_type,
             proxy_server or "ninguno",
@@ -149,8 +148,16 @@ class SessionActor:
         *,
         cookies: list[dict[str, Any]] | None = None,
         url: str | None = None,
+        traffic_debug: bool = False,
     ) -> AsyncIterator[SessionHandle]:
         """Abre una sesión de navegador autenticada y la cierra al salir.
+
+        Args:
+            cookies: Cookies en formato Playwright de la cuenta autenticada.
+            url: URL a navegar al abrir la sesión. Opcional.
+            traffic_debug: Fuerza el almacenamiento del cuerpo crudo de las
+                respuestas capturadas aunque ``debug`` global esté off
+                (necesario para confirmar acciones por tráfico GraphQL).
 
         Lanza Camoufox (o el factory inyectado en tests), crea un contexto
         con fingerprint coherente, inyecta las cookies y navega a ``url`` si
@@ -188,7 +195,7 @@ class SessionActor:
             # respuesta real del servidor en lugar del DOM.
             interceptor: NetworkInterceptor | None = None
             try:
-                candidate = NetworkInterceptor(debug=self.debug)
+                candidate = NetworkInterceptor(debug=self.debug or traffic_debug)
                 await candidate.attach(page)
                 interceptor = candidate
             except Exception as _exc:  # pragma: no cover
@@ -219,9 +226,7 @@ class SessionActor:
                 try:
                     handle.updated_cookies = await context.cookies()
                 except Exception as _exc:  # pragma: no cover
-                    logger.debug(
-                        "No se pudieron leer cookies post-sesión: %s", _exc
-                    )
+                    logger.debug("No se pudieron leer cookies post-sesión: %s", _exc)
                     handle.updated_cookies = None
         finally:
             await self._close(browser)
@@ -245,9 +250,7 @@ class SessionActor:
 
             try:
                 content = await handle.page.content()
-                (session_dir / "page.html").write_text(
-                    content, encoding="utf-8"
-                )
+                (session_dir / "page.html").write_text(content, encoding="utf-8")
             except Exception as exc:
                 logger.debug("No se pudo capturar el DOM de debug: %s", exc)
 
@@ -271,9 +274,7 @@ class SessionActor:
                         ],
                     }
                     traffic_path.write_text(
-                        json.dumps(
-                            index, ensure_ascii=False, indent=2, default=str
-                        ),
+                        json.dumps(index, ensure_ascii=False, indent=2, default=str),
                         encoding="utf-8",
                     )
                 except Exception as exc:

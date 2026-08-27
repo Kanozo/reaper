@@ -42,6 +42,10 @@ from typing import Any
 
 from reaper.actions.facebook import dom, selectors
 from reaper.actions.models import ActionError
+from reaper.anti_detection.human_behavior import (
+    human_type_focused,
+    human_type_locator,
+)
 from reaper.network.interceptor import CapturedTraffic
 from reaper.utils.logger import get_logger
 
@@ -111,9 +115,7 @@ async def post_text(
     await dom.type_best(page, selectors.COMPOSER_INPUT, text, timeout=SUBMIT_TIMEOUT)
 
     if image_paths:
-        await dom.set_files_best(
-            page, selectors.PHOTO_INPUT, image_paths, timeout=confirm_timeout
-        )
+        await dom.set_files_best(page, selectors.PHOTO_INPUT, image_paths, timeout=confirm_timeout)
 
     await dom.click_enabled_best(page, selectors.POST_SUBMIT, timeout=SUBMIT_TIMEOUT)
 
@@ -163,14 +165,10 @@ async def post_text_group(
 
     await dom.wait_for_page_ready(page, timeout=confirm_timeout)
     await _open_composer(page, selectors.GROUP_COMPOSER_TRIGGER, confirm_timeout)
-    await dom.type_best(
-        page, selectors.GROUP_COMPOSER_INPUT, text, timeout=SUBMIT_TIMEOUT
-    )
+    await dom.type_best(page, selectors.GROUP_COMPOSER_INPUT, text, timeout=SUBMIT_TIMEOUT)
 
     if image_paths:
-        await dom.set_files_best(
-            page, selectors.PHOTO_INPUT, image_paths, timeout=confirm_timeout
-        )
+        await dom.set_files_best(page, selectors.PHOTO_INPUT, image_paths, timeout=confirm_timeout)
 
     await dom.click_enabled_best(page, selectors.GROUP_POST_SUBMIT, timeout=SUBMIT_TIMEOUT)
 
@@ -219,19 +217,13 @@ async def share_post_to_group(
     post_url = page.url
 
     await dom.click_best(page, selectors.SHARE_BUTTON, timeout=confirm_timeout)
-    await dom.click_best(
-        page, selectors.SHARE_TO_GROUP_ENTRY, timeout=confirm_timeout
-    )
+    await dom.click_best(page, selectors.SHARE_TO_GROUP_ENTRY, timeout=confirm_timeout)
 
-    await dom.type_best(
-        page, selectors.GROUP_SEARCH_INPUT, group_name, timeout=confirm_timeout
-    )
+    await dom.type_best(page, selectors.GROUP_SEARCH_INPUT, group_name, timeout=confirm_timeout)
 
     # Pequeña pausa para que el resultado del buscador aparezca.
     await asyncio.sleep(1.0)
-    await dom.click_best(
-        page, selectors.group_option(group_name), timeout=confirm_timeout
-    )
+    await dom.click_best(page, selectors.group_option(group_name), timeout=confirm_timeout)
 
     await dom.click_best(page, selectors.SHARE_SUBMIT, timeout=confirm_timeout)
 
@@ -295,6 +287,260 @@ async def comment_on_post(
     return await _confirm_comment(page, post_url, text, previous_content, confirm_timeout)
 
 
+async def comment_in_feed(
+    page: Any,
+    article: Any,
+    *,
+    text: str,
+    confirm_timeout: int = DEFAULT_CONFIRM_TIMEOUT,
+    traffic: Any | None = None,
+) -> dict[str, Any]:
+    """Comenta ``text`` sobre un artículo del feed SIN navegar al permalink.
+
+    Estrategia inmune a feeds virtualizados (el DOM se reordena al hacer
+    scroll o al clic): se captura la posición Y del artículo, se pulsa su
+    trigger "Responder"/"Comentar" y la caja de texto se localiza por
+    GEOMETRÍA (elemento visible más cercano debajo del ancla), no por
+    identidad del nodo. Confirmación por conteo del texto en la página.
+
+    Args:
+        page:            Página activa con el feed cargado.
+        article:         Locator del artículo (``div[role='article']``).
+        text:            Texto del comentario.
+        confirm_timeout: Timeout de la confirmación DOM (ms).
+
+    Returns:
+        Dict de desenlace con ``comment_id`` si se detectó y
+        ``note="feed"`` para trazabilidad.
+
+    Raises:
+        ActionError: Si el composer inline no aparece o el envío falla.
+    """
+    try:
+        anchor_box = await article.bounding_box()
+    except Exception:
+        anchor_box = None
+    anchor_top = float(anchor_box["y"]) if anchor_box else None
+    normalized = " ".join(text.split())
+
+    baseline_html = await page.content()
+    # Subcadena distintiva: los últimos caracteres pueden transformarse en
+    # el DOM (links/mentions), el inicio basta y sobra para confirmar.
+    needle = normalized[:24]
+    baseline_count = _count_occurrences(baseline_html, needle)
+    # Variantes para payloads GraphQL: JSON escapa los no-ASCII (\u00ed),
+    # así que comparamos contra la forma escapada además del literal.
+    needle_variants = [needle]
+    try:
+        import json as _json
+
+        escaped = _json.dumps(needle, ensure_ascii=True)[1:-1]
+        if escaped and escaped != needle:
+            needle_variants.append(escaped)
+    except Exception:  # pragma: no cover
+        pass
+
+    # 1) Abrir el composer inline (algunos builds lo dejan ya enfocable).
+    try:
+        await dom.click_best_in(article, selectors.COMMENT_LINK, timeout=5_000)
+    except ActionError:
+        logger.debug("comment_in_feed: sin trigger; se intenta caja directa")
+
+    # 2) Caja de texto: geometría vía Playwright; si no hay layout, foco
+    #    quirúrgico vía JS (getBoundingClientRect + clic en el centro).
+    composer = await dom.closest_visible_below(
+        page, selectors.COMMENT_BOX, anchor_top, timeout=min(confirm_timeout, 10_000)
+    )
+    if composer is not None:
+        await human_type_locator(page, composer, text)
+    else:
+        focused = await dom.focus_composer_near(
+            page, selectors.COMMENT_BOX, anchor_top, timeout=8_000
+        )
+        if not focused:
+            raise ActionError(f"Composer de comentario no enfocable (ancla Y={anchor_top}).")
+        await human_type_focused(page, text)
+
+    # 3) Enviar: botón junto a la caja (por geometría, no por el artículo
+    #    que ya envejeció) y Enter como refuerzo; segundo Enter a mitad de
+    #    ventana si aún no hay confirmación (builds multilínea ignoran el
+    #    primero cuando inserta salto de línea).
+    submit_baseline = None
+    if traffic is not None:
+        try:
+            get_traffic = getattr(traffic, "get_traffic", None)
+            container = get_traffic() if callable(get_traffic) else traffic
+            submit_baseline = len(list(container.all_responses()))
+        except Exception:
+            submit_baseline = None
+    try:
+        submit_btn = await dom.closest_visible_below(
+            page, selectors.COMMENT_SUBMIT, anchor_top, timeout=4_000
+        )
+        if submit_btn is not None:
+            await dom._click_with_fallback(submit_btn, 3_000)
+            logger.debug("comment_in_feed | envío vía botón geométrico")
+    except ActionError:
+        pass
+    await dom.press_enter(page)
+    await asyncio.sleep(0.8)
+
+    retried_enter = False
+    half_deadline = asyncio.get_running_loop().time() + confirm_timeout / 2000
+
+    # 4) Confirmar: prioridad al tráfico GraphQL — SOLO respuestas NUEVAS
+    #    posteriores al envío (los listados traen comment_ids de comentarios
+    #    viejos que falsearían el hit). DOM como respaldo.
+    deadline = asyncio.get_running_loop().time() + confirm_timeout / 1000
+    while asyncio.get_running_loop().time() < deadline:
+        if traffic is not None:
+            comment_id = _traffic_comment_hit(traffic, needle_variants, baseline=submit_baseline)
+            if comment_id is not None:
+                return {
+                    "status": "ok",
+                    "post_url": page.url,
+                    "post_id": None,
+                    "comment_id": comment_id,
+                    "note": "feed",
+                    "error": None,
+                }
+        current_html = await page.content()
+        if _count_occurrences(current_html, needle) > baseline_count:
+            comment_id = None
+            try:
+                comment_id = dom.extract_first_match(current_html, selectors.COMMENT_ID_PATTERNS)
+            except Exception:  # pragma: no cover - best effort
+                pass
+            return {
+                "status": "ok",
+                "post_url": page.url,
+                "post_id": None,
+                "comment_id": comment_id,
+                "note": "feed",
+                "error": None,
+            }
+        if not retried_enter and asyncio.get_running_loop().time() >= half_deadline:
+            retried_enter = True
+            logger.debug("comment_in_feed | refuerzo: segundo Enter")
+            await dom.press_enter(page)
+        await asyncio.sleep(0.5)
+
+    return {
+        "status": "error",
+        "post_url": page.url,
+        "post_id": None,
+        "comment_id": None,
+        "note": "feed",
+        "error": "El comentario no se confirmó por tráfico ni DOM dentro del timeout",
+    }
+
+
+def _traffic_comment_hit(
+    traffic: Any,
+    needle_variants: list[str],
+    *,
+    baseline: int | None = None,
+) -> str | None:
+    """Busca la mutación de comentario confirmada en el tráfico GraphQL.
+
+    Solo examina respuestas NUEVAS posteriores a ``baseline`` (instantánea
+    tomada al enviar): los listados del feed traen comment_ids de
+    comentarios viejos que falsearían la confirmación.
+
+    Criterio, en orden:
+        1. Respuesta con ``comment_id`` numérico.
+        2. Respuesta cuyo payload contenga el texto enviado (cualquiera de
+           sus variantes: literal o escapada JSON).
+        3. Respuesta de operación ``*CreateComment*`` aunque no exponga el
+           id en un campo plano.
+
+    Returns:
+        El ``comment_id`` detectado (o ``"sin-id"``), o ``None``.
+    """
+    get_traffic = getattr(traffic, "get_traffic", None)
+    container = get_traffic() if callable(get_traffic) else traffic
+
+    if baseline is None:
+        baseline = _response_baseline(traffic) or 0
+    try:
+        all_responses = list(container.all_responses())
+    except Exception as exc:
+        logger.debug("traffic_comment | contenedor no accesible | %s", exc)
+        return None
+    fresh = all_responses[baseline:]
+    logger.debug(
+        "traffic_comment | total=%d | nuevas desde el envío=%d",
+        len(all_responses),
+        len(fresh),
+    )
+
+    for response in reversed(fresh):  # la más reciente primero
+        payload = _payload_of(response)
+        if not payload:
+            continue
+        match = re.search(r'"comment_id"\s*:\s*"?(\d{8,40})', payload)
+        if match:
+            return match.group(1)
+        for variant in needle_variants:
+            if variant and variant in payload:
+                return "sin-id"
+
+    # Refuerzo: alguna respuesta NUEVA de una op *CreateComment*, aunque
+    # su payload no exponga campos reconocibles.
+    try:
+        fresh_ids = {id(response) for response in fresh}
+        create_ops = container.graphql_by_operation("CreateComment")
+        for response in reversed(create_ops):
+            if id(response) not in fresh_ids:
+                continue
+            if _payload_of(response):
+                return "sin-id"
+    except Exception:  # pragma: no cover
+        pass
+    return None
+
+
+def _response_baseline(traffic: Any) -> int | None:
+    """Número de respuestas capturadas hasta ahora (o ``None``)."""
+    for getter in ("total_responses", "snapshot_activity"):
+        value = getattr(traffic, getter, None)
+        if callable(value):
+            try:
+                return int(value())
+            except Exception:
+                continue
+    return None
+
+
+def _payload_of(response: Any) -> str:
+    """Cuerpo crudo o serializado de una respuesta capturada."""
+    raw = getattr(response, "body_raw", None)
+    if raw:
+        return str(raw)
+    try:
+        from reaper.network.interceptor import CapturedTraffic
+
+        return str(CapturedTraffic.normalize_body(getattr(response, "body", None)))
+    except Exception:
+        return ""
+
+
+def _count_occurrences(html: str, needle: str) -> int:
+    """Veces que aparece ``needle`` normalizado en un HTML."""
+    if not needle:
+        return 0
+    haystack = re.sub(r"\s+", " ", html)
+    return haystack.count(needle)
+
+
+async def _article_text(article: Any) -> str:
+    """Texto plano normalizado de un artículo del feed."""
+    try:
+        return re.sub(r"\s+", " ", (await article.inner_text()).strip())
+    except Exception:
+        return ""
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Reaccionar con "Me gusta"
 # ─────────────────────────────────────────────────────────────────────────────
@@ -343,9 +589,7 @@ async def like_post(
         await asyncio.sleep(0.3)
         elapsed += 0.3
     else:
-        return _failure_result(
-            "No se detectó la reacción activa tras dar like.", post_url=post_url
-        )
+        return _failure_result("No se detectó la reacción activa tras dar like.", post_url=post_url)
 
     logger.info("Like ejecutado | post_url=%s", post_url)
     return {
@@ -391,12 +635,8 @@ async def _open_composer(
     # Composer YA abierto = campo editable visible Y botón Publicar también.
     # En el perfil nuevo hay un ``contenteditable`` "colapsado" siempre visible
     # que NO es el composer real: si solo está EDITE, hay que clicar el trigger.
-    open_input = await dom.wait_any_visible(
-        page, selectors.COMPOSER_INPUT, timeout=4_000
-    )
-    submit_visible = await dom.wait_any_visible(
-        page, selectors.POST_SUBMIT, timeout=4_000
-    )
+    open_input = await dom.wait_any_visible(page, selectors.COMPOSER_INPUT, timeout=4_000)
+    submit_visible = await dom.wait_any_visible(page, selectors.POST_SUBMIT, timeout=4_000)
     if open_input is not None and submit_visible is not None:
         return
 
@@ -409,18 +649,21 @@ async def _open_composer(
             # El diálogo del composer tarda en renderizarse, sobre todo con
             # redes lentas: hay que esperar más que el timeout de confirmación.
             await asyncio.sleep(0.8)
-            if await dom.wait_any_visible(
-                page, selectors.COMPOSER_INPUT, timeout=COMPOSER_OPEN_TIMEOUT
-            ) is not None and await dom.wait_any_visible(
-                page, selectors.POST_SUBMIT, timeout=COMPOSER_OPEN_TIMEOUT
-            ) is not None:
+            if (
+                await dom.wait_any_visible(
+                    page, selectors.COMPOSER_INPUT, timeout=COMPOSER_OPEN_TIMEOUT
+                )
+                is not None
+                and await dom.wait_any_visible(
+                    page, selectors.POST_SUBMIT, timeout=COMPOSER_OPEN_TIMEOUT
+                )
+                is not None
+            ):
                 return
             last_error = "El clic no abrió el diálogo"
         except ActionError as exc:
             last_error = str(exc)
-        logger.debug(
-            "Reintento de apertura del composer %d/3 | error=%s", attempt, last_error
-        )
+        logger.debug("Reintento de apertura del composer %d/3 | error=%s", attempt, last_error)
         await asyncio.sleep(2.0)
 
     raise ActionError(
@@ -503,9 +746,7 @@ async def _confirm_new_post(
             near_url = None
             try:
                 content = await dom.page_content(page)
-                near_url = _post_url_near_text(
-                    content, text, owner_id=_owner_id_from_url(page.url)
-                )
+                near_url = _post_url_near_text(content, text, owner_id=_owner_id_from_url(page.url))
             except Exception as exc:
                 logger.debug("Búsqueda de permalink cercano falló: %s", exc)
             if near_url:
@@ -548,8 +789,7 @@ async def _confirm_new_post(
             )
         if len(new_links) > 1:
             logger.debug(
-                "Varios enlaces nuevos tras publicar (%d); se descarta el "
-                "diff por ambigüedad.",
+                "Varios enlaces nuevos tras publicar (%d); se descarta el diff por ambigüedad.",
                 len(new_links),
             )
 
@@ -580,9 +820,7 @@ async def _post_text_published(page: Any, text: str) -> bool:
     # El DIÁLOGO del composer debe haberse cerrado (el post se publicó). No se
     # vigila el contenteditable: el perfil tiene uno "colapsado" siempre
     # visible que haría creer que el composer sigue abierto.
-    dialog_open = await dom.wait_any_visible(
-        page, selectors.COMPOSER_DIALOG, timeout=600
-    )
+    dialog_open = await dom.wait_any_visible(page, selectors.COMPOSER_DIALOG, timeout=600)
     return dialog_open is None
 
 
@@ -619,9 +857,7 @@ async def _confirm_comment(
         elapsed += 0.4
         await asyncio.sleep(0.4)
 
-    return _failure_result(
-        "No se confirmó el comentario en el DOM.", post_url=post_url
-    )
+    return _failure_result("No se confirmó el comentario en el DOM.", post_url=post_url)
 
 
 def _failure_result(
@@ -806,9 +1042,7 @@ def _post_id_from_story_id(raw: Any) -> str | None:
     if not isinstance(raw, str) or not raw:
         return None
     try:
-        decoded = base64.b64decode(raw + "=" * (-len(raw) % 4)).decode(
-            "utf-8", errors="replace"
-        )
+        decoded = base64.b64decode(raw + "=" * (-len(raw) % 4)).decode("utf-8", errors="replace")
     except Exception:
         return None
     match = _STORY_ID_PATTERN.match(decoded)
@@ -903,10 +1137,7 @@ def _new_post_from_traffic(traffic: Any, owner_id: str | None = None) -> tuple[s
     if not candidates:
         return None
 
-    owned = [
-        cand for cand in candidates
-        if owner_id is None or f"id={owner_id}" in cand[1]
-    ]
+    owned = [cand for cand in candidates if owner_id is None or f"id={owner_id}" in cand[1]]
     if not owned:
         owned = candidates
 
@@ -1028,9 +1259,7 @@ def _is_publish_response(
     los requests capturados.
     """
     if getattr(resp, "operation", None):
-        return any(
-            marker in resp.operation for marker in _PUBLISH_OPERATION_MARKERS
-        )
+        return any(marker in resp.operation for marker in _PUBLISH_OPERATION_MARKERS)
     for req in captured.graphql_requests:
         if req.url != resp.url:
             continue
@@ -1096,6 +1325,7 @@ def _post_id_from_any_url(url: str) -> str | None:
         return match.group(1)
     return None
 
+
 def _clean_post_url(url: str) -> str:
     """Limpia una URL de post de basura de tracking (``notif_*``, ``ref=``).
 
@@ -1115,7 +1345,8 @@ def _clean_post_url(url: str) -> str:
         return url
     base, query = match.group(1), match.group(2) or ""
     keep = [
-        param for param in query.split("&")
+        param
+        for param in query.split("&")
         if param
         and not param.startswith("notif_")
         and not param.startswith("ref=")

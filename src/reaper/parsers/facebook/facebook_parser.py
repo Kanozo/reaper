@@ -399,7 +399,14 @@ class FacebookContentParser(BaseParser):
             if renderer_type == "StoryAttachmentAlbumStyleRenderer":
                 attachments.extend(self._extract_album_attachment(style))
 
-            elif renderer_type == "StoryAttachmentVideoStyleRenderer":
+            elif renderer_type in (
+                "StoryAttachmentVideoStyleRenderer",
+                # Renderer unificado actual (search/feed ago 2026): el media
+                # completo vive en styles.attachment.media con progressive_urls
+                # y captions; el att.media de primer nivel es solo referencia
+                # ({__isNode, __typename, id}).
+                "StoryAttachmentUnifiedLightweightVideoStyleRenderer",
+            ):
                 # Retorno directo: el vídeo principal reemplaza toda la lista
                 return self._extract_video_attachment(style)
 
@@ -459,10 +466,8 @@ class FacebookContentParser(BaseParser):
             {
                 "type": media.get("__typename"),
                 "id": media.get("id", ""),
-                "url": self._safe_get(
-                    media, "videoDeliveryLegacyFields", "browser_native_sd_url",
-                    default="",
-                ),
+                "url": self._video_playback_url(media),
+                "permalink_url": self._video_permalink(media),
                 "caption": captions,
                 "thumbnail_url": self._safe_get(
                     media, "thumbnailImage", "uri", default=""
@@ -472,6 +477,58 @@ class FacebookContentParser(BaseParser):
                 "height": media.get("height"),
             }
         ]
+
+    def _video_playback_url(self, media: dict[str, Any] | None) -> str | None:
+        """Resuelve la URL de reproducción de un vídeo (uso interno).
+
+        Prioridad verificada contra tráfico real (ago 2026):
+
+        1. ``videoDeliveryLegacyFields.browser_native_sd_url`` — formato
+           legacy (aún presente en algunas superficies).
+        2. ``videoDeliveryResponseFragment.videoDeliveryResponseResult
+           .progressive_urls[].progressive_url`` — formato actual; la
+           primera entrada es la de mayor calidad.
+
+        Args:
+            media: Nodo media del vídeo (el completo, no la referencia).
+
+        Returns:
+            URL directa de reproducción (mp4), o None si no hay ninguna.
+        """
+        if not isinstance(media, dict):
+            return None
+
+        legacy = self._safe_get(
+            media, "videoDeliveryLegacyFields", "browser_native_sd_url"
+        )
+        if legacy:
+            return str(legacy)
+
+        progressive = self._safe_get(
+            media,
+            "videoDeliveryResponseFragment",
+            "videoDeliveryResponseResult",
+            "progressive_urls",
+            default=[],
+        )
+        for entry in progressive or []:
+            if isinstance(entry, dict) and entry.get("progressive_url"):
+                return str(entry["progressive_url"])
+        return None
+
+    def _video_permalink(self, media: dict[str, Any] | None) -> str | None:
+        """Resuelve el permalink estable de un vídeo (uso interno).
+
+        Args:
+            media: Nodo media del vídeo.
+
+        Returns:
+            URL pública permanente (p.ej. ``/reel/<id>``), o None.
+        """
+        if not isinstance(media, dict):
+            return None
+        permalink = media.get("url") or media.get("permalink_url")
+        return str(permalink) if permalink else None
 
     def _extract_simple_attachment(
         self,
@@ -525,38 +582,58 @@ class FacebookContentParser(BaseParser):
         Args:
             att: Nodo de adjunto.
             story: Nodo Story completo.
-            media: Nodo media ya extraído.
+            media: Nodo media ya extraído. En las respuestas actuales puede
+                ser solo la referencia ``{__isNode, __typename, id}``; en
+                ese caso se resuelve el nodo completo desde
+                ``att.styles.attachment.media``.
             include_video_metadata: Si True, enriquece con metadatos de vídeo.
 
         Returns:
             Dict con los datos del vídeo o reel.
         """
+        # El media de primer nivel suele ser una referencia sin datos
+        # (verificado contra tráfico real ago 2026): resolver el completo.
+        full_media = media if (media.get("url") or media.get("width")) else (
+            self._safe_get(att, "styles", "attachment", "media") or media
+        )
+
         sfc = story.get("short_form_video_context") or {}
         is_reel_context = (
             media.get("playback_duration_in_ms")
             or media.get("is_short_video")
             or sfc
         )
+        permalink = self._video_permalink(full_media)
+        # Un vídeo sin contexto reel pero con permalink /reel/ es un reel.
+        if not is_reel_context and permalink and "/reel/" in permalink:
+            is_reel_context = True
         content_type = "reel" if is_reel_context else "video"
 
-        # URL de reproducción
-        url = self._safe_get(
-            is_reel_context if isinstance(is_reel_context, dict) else sfc,
-            "playback_video", "videoDeliveryLegacyFields", "browser_native_sd_url",
+        # URL de reproducción: contexto reel (legacy) → helpers sobre el
+        # media completo (progressive_urls / legacy fields / permalink).
+        url = (
+            self._safe_get(
+                is_reel_context if isinstance(is_reel_context, dict) else sfc,
+                "playback_video", "videoDeliveryLegacyFields", "browser_native_sd_url",
+            )
+            or self._video_playback_url(full_media)
         )
 
-        # Captions (con descarga y conversión SRT→dict)
+        # Captions (con descarga y conversión SRT→dict): contexto reel o,
+        # en su defecto, el propio media del adjunto.
         captions = self._process_captions_locales(
             self._safe_get(
                 story, "short_form_video_context", "playback_video",
                 "video_available_captions_locales", default=[],
             )
+            or full_media.get("video_available_captions_locales")
         )
 
         result: dict[str, Any] = {
             "type": content_type,
             "id": media.get("id", ""),
             "url": url,
+            "permalink_url": permalink,
             "caption": captions,
         }
 
@@ -577,12 +654,16 @@ class FacebookContentParser(BaseParser):
                 }
 
             result.update({
-                "duration_ms": video_node.get("playable_duration_in_ms"),
-                "width": self._safe_get(reel_ctx, "playback_video", "width"),
-                "height": self._safe_get(reel_ctx, "playback_video", "height"),
+                "duration_ms": video_node.get("playable_duration_in_ms")
+                or full_media.get("playable_duration_in_ms"),
+                "width": self._safe_get(reel_ctx, "playback_video", "width")
+                or full_media.get("width"),
+                "height": self._safe_get(reel_ctx, "playback_video", "height")
+                or full_media.get("height"),
                 "thumbnail_url": self._safe_get(
                     reel_ctx, "playback_video", "thumbnailImage", "uri", default=""
-                ),
+                )
+                or self._safe_get(full_media, "thumbnailImage", "uri", default=""),
                 "reshare_creator": reshare_creator,
             })
 
@@ -778,9 +859,19 @@ class FacebookContentParser(BaseParser):
         for caption_item in captions_locales or []:
             if not isinstance(caption_item, dict):
                 continue
+            # Aceptar variantes regionales completas (es_ES, es_CL, en_US,
+            # en_GB...) vía prefijo, y ambos nombres del campo de lenguaje
+            # ("localized_language" legacy y "localized_unambiguous_language"
+            # actual — verificado contra tráfico real ago 2026).
+            locale = str(caption_item.get("locale") or "")
+            language = (
+                caption_item.get("localized_language")
+                or caption_item.get("localized_unambiguous_language")
+                or ""
+            )
             if (
-                caption_item.get("locale") in {"en_US", "es_ES"}
-                or caption_item.get("localized_language") in {"English", "Español"}
+                locale.startswith(("en_", "es_"))
+                or language in {"English", "Español"}
             ):
                 caption_item["captions_url"] = srt_to_dict(
                     get_text_from_url(caption_item.get("captions_url"))

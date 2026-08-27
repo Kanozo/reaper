@@ -16,7 +16,8 @@ Jerarquía de herencia::
         ├── VideoParser         → vídeos nativos (facebook.com/videos/<id>)
         ├── GroupParser         → grupos (facebook.com/groups/<id>)
         ├── ProfileParser       → perfiles (facebook.com/<username>)
-        └── PhotoParser         → fotos individuales (facebook.com/photo/)
+        ├── PhotoParser         → fotos individuales (facebook.com/photo/)
+        └── SearchParser        → búsquedas (facebook.com/search/posts?q=...)
     BaseParser
     ├── IgPostParser            → posts de Instagram (/p/<code>)
     └── IgReelParser            → reels de Instagram (/reel/<code>)
@@ -30,6 +31,7 @@ from reaper.parsers.facebook.video_parser import VideoParser
 from reaper.parsers.facebook.group_parser import GroupParser
 from reaper.parsers.facebook.profile_parser import ProfileParser
 from reaper.parsers.facebook.photo_parser import PhotoParser
+from reaper.parsers.facebook.search_parser import SearchParser
 from reaper.parsers.instagram.ig_post_parser import IgPostParser
 from reaper.parsers.instagram.ig_reel_parser import IgReelParser
 from reaper.parsers.instagram.ig_profile_parser import IgProfileParser
@@ -43,6 +45,7 @@ __all__ = [
     "GroupParser",
     "ProfileParser",
     "PhotoParser",
+    "SearchParser",
     "IgPostParser",
     "IgReelParser",
     "IgProfileParser"

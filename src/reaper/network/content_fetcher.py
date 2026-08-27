@@ -176,6 +176,7 @@ def _serialize_response(resp: CapturedResponse) -> dict[str, Any]:
         "url": resp.url,
         "status": resp.status,
         "category": resp.category,
+        "operation": resp.operation,
         "timestamp": resp.timestamp.isoformat() if resp.timestamp else None,
         "body": resp.body,
         "body_raw": resp.body_raw,
@@ -285,6 +286,7 @@ def _write_response_files(
             "url": resp.url,
             "status": resp.status,
             "category": resp.category,
+            "operation": resp.operation,
             "timestamp": resp.timestamp.isoformat() if resp.timestamp else None,
             # Referencia __FILE__ → deserialize_traffic() carga el fichero al reconstruir
             "body": f"__FILE__{fname}",
@@ -1173,6 +1175,7 @@ def deserialize_traffic(
             status=d.get("status", 0),
             category=category,
             timestamp=_parse_dt(d.get("timestamp")) or datetime.now(),
+            operation=d.get("operation"),
             body=_resolve_body(d.get("body"), category),
             body_raw=d.get("body_raw"),
             headers=d.get("headers", {}),

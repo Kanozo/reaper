@@ -34,6 +34,7 @@ from reaper.parsers import (
     PostParser,
     ProfileParser,
     ReelParser,
+    SearchParser,
     VideoParser,
 )
 from reaper.scrapers.base import BaseScraper
@@ -87,6 +88,7 @@ _PRIMARY_PARSER_MAP: dict[str, type] = {
     "ProfileParser": ProfileParser,
     "HashtagParser": PostParser,
     "PhotoParser":   PhotoParser,
+    "SearchParser":  SearchParser,
 }
 
 _FALLBACK_PARSER_MAP: dict[str, type] = {

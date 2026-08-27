@@ -24,7 +24,7 @@ import time
 from typing import Any
 
 from reaper.actions.models import ActionError
-from reaper.anti_detection.human_behavior import human_type
+from reaper.anti_detection.human_behavior import human_type, human_type_locator
 from reaper.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -109,9 +109,7 @@ async def wait_any_visible_many(
         for candidates in groups:
             selector, locator = await _first_match(page, candidates, 400)
             if locator is not None:
-                logger.debug(
-                    "Elemento visible en grupo | selector=%s", selector
-                )
+                logger.debug("Elemento visible en grupo | selector=%s", selector)
                 return locator
         await asyncio.sleep(0.2)
     return None
@@ -132,13 +130,10 @@ async def click_best(
     Raises:
         ActionError: Si ningún candidato es visible o el clic falla.
     """
-    selector, locator = await _first_match(
-        page, candidates, timeout, require_clickable=True
-    )
+    selector, locator = await _first_match(page, candidates, timeout, require_clickable=True)
     if locator is None:
         raise ActionError(
-            "Elemento no encontrado al hacer clic. Candidatos: "
-            f"{_describe_candidates(candidates)}"
+            f"Elemento no encontrado al hacer clic. Candidatos: {_describe_candidates(candidates)}"
         )
     await _click_with_fallback(locator, timeout)
     logger.debug("Clic ejecutado | selector=%s", selector)
@@ -167,17 +162,14 @@ async def click_enabled_best(
     deadline = time.monotonic() + timeout / 1000
     while time.monotonic() < deadline:
         remaining = max(100, int((deadline - time.monotonic()) * 1000))
-        _, locator = await _first_match(
-            page, candidates, remaining, require_enabled=True
-        )
+        _, locator = await _first_match(page, candidates, remaining, require_enabled=True)
         if locator is not None:
             await _click_with_fallback(locator, remaining)
             logger.debug("Clic en elemento habilitado | selector=%s", candidates[0])
             return
         await asyncio.sleep(0.3)
     raise ActionError(
-        "El botón de confirmación no se habilitó. Candidatos: "
-        f"{_describe_candidates(candidates)}"
+        f"El botón de confirmación no se habilitó. Candidatos: {_describe_candidates(candidates)}"
     )
 
 
@@ -201,13 +193,117 @@ async def type_best(
     selector, locator = await _first_match(page, candidates, timeout)
     if locator is None or selector is None:
         raise ActionError(
-            "Campo de texto no encontrado. Candidatos: "
-            f"{_describe_candidates(candidates)}"
+            f"Campo de texto no encontrado. Candidatos: {_describe_candidates(candidates)}"
         )
     await human_type(page, selector, text)
 
     # Espacio mental del usuario antes de pasar a la siguiente acción.
     await asyncio.sleep(0.4)
+
+
+async def click_best_in(
+    scope: Any,
+    candidates: tuple[str, ...],
+    timeout: int = 10_000,
+) -> None:
+    """Variante SCOPED de :func:`click_best` dentro de un contenedor.
+
+    Args:
+        scope:      Página o Locator contenedor (p. ej. un artículo del feed).
+        candidates: Selectores CSS probados en orden dentro del contenedor.
+        timeout:    Presupuesto total de tiempo (ms).
+
+    Raises:
+        ActionError: Si ningún candidato es visible o el clic falla.
+    """
+    selector, locator = await _first_match(scope, candidates, timeout)
+    if locator is None:
+        raise ActionError(
+            "Elemento no encontrado en el contenedor. Candidatos: "
+            f"{_describe_candidates(candidates)}"
+        )
+    await _click_with_fallback(locator, timeout)
+    logger.debug("Clic ejecutado (scoped) | selector=%s", selector)
+
+
+async def type_best_in(
+    page: Any,
+    scope: Any,
+    candidates: tuple[str, ...],
+    text: str,
+    timeout: int = 10_000,
+) -> None:
+    """Escribe con ritmo humano en el primer campo visible DENTRO de un scope.
+
+    Args:
+        page:       Página de Playwright activa (teclado global).
+        scope:      Página o Locator que acota la búsqueda del campo.
+        candidates: Selectores CSS del campo de texto.
+        text:       Texto a escribir.
+        timeout:    Presupuesto total de tiempo (ms).
+
+    Raises:
+        ActionError: Si ningún candidato es visible o la escritura falla.
+    """
+    selector, locator = await _first_match(scope, candidates, timeout)
+    if locator is None or selector is None:
+        raise ActionError(
+            "Campo de texto no encontrado en el contenedor. Candidatos: "
+            f"{_describe_candidates(candidates)}"
+        )
+    await human_type_locator(page, locator, text)
+    # Espacio mental del usuario antes de pasar a la siguiente acción.
+    await asyncio.sleep(0.4)
+
+
+async def closest_visible_below(
+    page: Any,
+    candidates: tuple[str, ...],
+    anchor_top: float | None,
+    timeout: int = 10_000,
+) -> Any | None:
+    """Primer elemento visible entre candidatos cuya Y está bajo ``anchor_top``.
+
+    Pensado para feeds virtualizados: tras un clic que muta el DOM, los
+    locators encadenados pueden envejecer; anclar por geometría (posición en
+    pantalla respecto al artículo clicado) es inmune a ese reordenamiento.
+
+    Args:
+        page:       Página de Playwright activa.
+        candidates: Selectores CSS a evaluar a nivel de página.
+        anchor_top: Y superior del elemento ancla (p. ej. el artículo). Con
+            ``None`` se acepta cualquier elemento visible.
+        timeout:    Presupuesto total de tiempo (ms).
+
+    Returns:
+        Locator del elemento elegido (el más cercano verticalmente al ancla)
+        o ``None`` si no aparece ninguno en el presupuesto.
+    """
+    deadline = time.monotonic() + timeout / 1000
+    tolerance_px = 140.0  # margen para bordes/paddings del propio ancla
+    while time.monotonic() < deadline:
+        best: tuple[float, Any] | None = None
+        for selector in candidates:
+            loc_list = page.locator(selector)
+            count = await loc_list.count()
+            for index in range(count):
+                locator = loc_list.nth(index)
+                try:
+                    box = await locator.bounding_box()
+                    if box is None or box.get("height", 0) <= 0:
+                        continue
+                    top = float(box.get("y", 0))
+                    if anchor_top is not None and top < anchor_top - tolerance_px:
+                        continue
+                    distance = top if anchor_top is None else abs(top - anchor_top)
+                    if best is None or distance < best[0]:
+                        best = (distance, locator)
+                except Exception as exc:
+                    logger.debug("closest_visible_below: candidato inválido | %s", exc)
+        if best is not None:
+            return best[1]
+        await asyncio.sleep(0.25)
+    return None
 
 
 async def set_files_best(
@@ -232,18 +328,13 @@ async def set_files_best(
     Raises:
         ActionError: Si ningún input de archivo está presente en el DOM.
     """
-    selector, locator = await _first_match(
-        page, candidates, timeout, require_visible=False
-    )
+    selector, locator = await _first_match(page, candidates, timeout, require_visible=False)
     if locator is None:
         raise ActionError(
-            "Input de archivo no encontrado. Candidatos: "
-            f"{_describe_candidates(candidates)}"
+            f"Input de archivo no encontrado. Candidatos: {_describe_candidates(candidates)}"
         )
     await locator.set_input_files(paths)
-    logger.debug(
-        "Archivos adjuntados | selector=%s | count=%d", selector, len(paths)
-    )
+    logger.debug("Archivos adjuntados | selector=%s | count=%d", selector, len(paths))
 
 
 async def wait_any_hidden(
@@ -405,17 +496,11 @@ async def _first_match(
                             continue
                     if require_clickable:
                         box = await locator.bounding_box()
-                        if (
-                            box is None
-                            or box.get("width", 0) <= 1
-                            or box.get("height", 0) <= 1
-                        ):
+                        if box is None or box.get("width", 0) <= 1 or box.get("height", 0) <= 1:
                             continue
                     return selector, locator
                 except Exception as exc:
-                    logger.debug(
-                        "Candidato no visible | selector=%s | %s", selector, exc
-                    )
+                    logger.debug("Candidato no visible | selector=%s | %s", selector, exc)
         await asyncio.sleep(0.2)
     return None, None
 
@@ -455,3 +540,107 @@ async def _click_with_fallback(locator: Any, timeout: int) -> None:
 def _describe_candidates(candidates: tuple[str, ...]) -> str:
     """Formatea la lista de candidatos para mensajes de error legibles."""
     return "; ".join(candidates) if candidates else "(sin candidatos)"
+
+
+async def newest_attached(
+    page: Any,
+    candidates: tuple[str, ...],
+    timeout: int = 6_000,
+) -> Any | None:
+    """Último elemento PRESENTE (visible o no) entre los candidatos.
+
+    Pensado para composers montados sin layout medible: devuelve el más
+    reciente del DOM (última coincidencia del primer candidato con matches),
+    que tras un clic en "Responder" es el composer recién abierto.
+
+    Args:
+        page:       Página de Playwright activa.
+        candidates: Selectores CSS probados en orden.
+        timeout:    Presupuesto total de tiempo (ms).
+
+    Returns:
+        Locator del último match, o ``None`` si no aparece ninguno.
+    """
+    deadline = time.monotonic() + timeout / 1000
+    while time.monotonic() < deadline:
+        for selector in candidates:
+            loc_list = page.locator(selector)
+            count = await loc_list.count()
+            if count:
+                return loc_list.nth(count - 1)
+        await asyncio.sleep(0.25)
+    return None
+
+_FOCUS_NEAR_JS: str = """
+([selectors, anchorTop, tolerance]) => {
+  let best = null;
+  for (const sel of selectors) {
+    for (const el of document.querySelectorAll(sel)) {
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) continue;
+      if (anchorTop !== null && r.top < anchorTop - tolerance) continue;
+      const d = Math.abs(r.top - (anchorTop ?? r.top));
+      if (!best || d < best.d) best = { d, el };
+    }
+  }
+  if (!best) return null;
+  best.el.scrollIntoView({ block: "center" });
+  const rect = best.el.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  best.el.focus();
+  return {
+    ok: document.activeElement === best.el,
+    x: cx,
+    y: cy,
+    focused: document.activeElement === best.el,
+  };
+}
+"""
+
+
+async def focus_composer_near(
+    page: Any,
+    candidates: tuple[str, ...],
+    anchor_top: float | None,
+    timeout: int = 8_000,
+    tolerance_px: float = 140.0,
+) -> bool:
+    """Foca (con clic real en su centro) el composer más cercano bajo el ancla.
+
+    Todo el cálculo geométrico corre EN EL NAVEGADOR vía
+    ``getBoundingClientRect``, inmune al problema de ``bounding_box()`` de
+    Playwright con elementos montados sin layout consolidado.
+
+    Args:
+        page:         Página de Playwright activa.
+        candidates:   Selectores CSS de cajas de comentario.
+        anchor_top:   Y del artículo objetivo (``None`` = sin ancla).
+        timeout:      Presupuesto total (ms) reintentando cada ~400 ms.
+        tolerance_px: Margen vertical respecto al ancla.
+
+    Returns:
+        ``True`` si un composer quedó con el foco.
+    """
+    deadline = time.monotonic() + timeout / 1000
+    while time.monotonic() < deadline:
+        try:
+            outcome = await page.evaluate(
+                _FOCUS_NEAR_JS,
+                [list(candidates), anchor_top, tolerance_px],
+            )
+        except Exception as exc:
+            logger.debug("focus_composer_near: evaluate falló | %s", exc)
+            outcome = None
+        if outcome:
+            if not outcome.get("ok"):
+                # El focus() programático no bastó: clic humano en el centro.
+                try:
+                    await page.mouse.click(outcome["x"], outcome["y"])
+                    await asyncio.sleep(0.3)
+                except Exception as exc:
+                    logger.debug("focus_composer_near: mouse.click | %s", exc)
+            else:
+                return True
+        await asyncio.sleep(0.4)
+    return False

@@ -36,6 +36,10 @@ Códigos de salida:
     2 → URL inválida (ValueError)
     3 → Plataforma no soportada (UnsupportedPlatformError)
     4 → Error en runtime del scraping (ScrapingError)
+
+Subcomandos:
+    reaper action {post,share,comment,like}  Acciones de escritura autenticadas.
+    reaper search <query>                    Extracción de resultados de búsqueda.
 """
 
 import argparse
@@ -67,7 +71,10 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="reaper",
-        description="Scraper de Facebook e Instagram. Extrae datos de posts, reels, grupos y perfiles.",
+        description=(
+            "Scraper de Facebook e Instagram. Extrae datos de posts, reels, "
+            "grupos, perfiles y búsquedas."
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 ejemplos:
@@ -76,6 +83,9 @@ ejemplos:
   reaper https://fb.com/groups/123/posts/456 --proxy http://proxy:8080
   reaper https://fb.com/reel/123 --output resultado.json --indent 4
   reaper https://fb.com/reel/123 --no-scroll
+
+  # Búsquedas (subcomando dedicado, requiere cuenta)
+  reaper search cuba --time-range week -o resultados.json
         """,
     )
 
@@ -377,6 +387,194 @@ def _run_action_cli(argv: list[str]) -> None:
         sys.exit(1)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CLI de búsquedas (reaper search ...)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def build_search_parser() -> argparse.ArgumentParser:
+    """Construye el parser de ``reaper search <query>``.
+
+    Returns:
+        ``argparse.ArgumentParser`` con la consulta, filtros temporales y
+        las opciones comunes de scraping.
+    """
+    parser = argparse.ArgumentParser(
+        prog="reaper search",
+        description=(
+            "Buscar publicaciones en Facebook y extraer los resultados. "
+            "Requiere al menos una cuenta disponible (las búsquedas "
+            "anónimas chocan con el muro de autenticación)."
+        ),
+        epilog="""
+ejemplos:
+  reaper search cuba --time-range hour
+  reaper search "huracán" --time-range week --infinity-scroll
+  reaper search noticias --time-range today --account mi_cuenta -o resultados.json
+        """,
+    )
+    parser.add_argument(
+        "query",
+        help=(
+            "Texto a buscar: palabra, hashtag (#cuba) o varias palabras "
+            "separadas por espacio. El '#' se envía codificado para que "
+            "la búsqueda lo contemple."
+        ),
+    )
+    parser.add_argument(
+        "--time-range",
+        dest="time_range",
+        choices=["hour", "today", "week", "month", "year"],
+        default="hour",
+        help="Filtro temporal de los posts. Defecto: hour.",
+    )
+
+    # ── Opciones del navegador ────────────────────────────────────────────────
+    browser_group = parser.add_argument_group("opciones del navegador")
+    browser_group.add_argument(
+        "--no-headless",
+        dest="headless",
+        action="store_false",
+        default=True,
+        help="Mostrar la ventana del navegador. Por defecto: headless.",
+    )
+    browser_group.add_argument(
+        "--screenshot",
+        action="store_true",
+        default=False,
+        help="Capturar screenshot durante el scraping.",
+    )
+
+    # ── Opciones de scroll ────────────────────────────────────────────────────
+    scroll_group = parser.add_argument_group("opciones de scroll")
+    scroll_group.add_argument(
+        "--no-scroll",
+        dest="auto_scroll",
+        action="store_false",
+        default=True,
+        help="Desactivar el scroll automático. Por defecto: activado.",
+    )
+    scroll_group.add_argument(
+        "--infinity-scroll",
+        action="store_true",
+        default=True,
+        help=(
+            "Scroll continuo monitorizando tráfico de red "
+            "(activado por defecto; captura más páginas del feed)."
+        ),
+    )
+    scroll_group.add_argument(
+        "--no-infinity-scroll",
+        dest="infinity_scroll",
+        action="store_false",
+        help="Desactivar el scroll infinito.",
+    )
+
+    # ── Opciones de proxy ─────────────────────────────────────────────────────
+    proxy_group = parser.add_argument_group("opciones de proxy")
+    proxy_group.add_argument(
+        "--proxy",
+        dest="proxy_server",
+        metavar="URL",
+        default=None,
+        help="Servidor proxy, p.ej. 'http://ip:8080'.",
+    )
+    proxy_group.add_argument(
+        "--proxy-user",
+        dest="proxy_username",
+        metavar="USUARIO",
+        default=None,
+        help="Usuario del proxy.",
+    )
+    proxy_group.add_argument(
+        "--proxy-pass",
+        dest="proxy_password",
+        metavar="CONTRASEÑA",
+        default=None,
+        help="Contraseña del proxy.",
+    )
+
+    # ── Opciones de salida ────────────────────────────────────────────────────
+    output_group = parser.add_argument_group("opciones de salida")
+    output_group.add_argument(
+        "--output", "-o",
+        type=Path,
+        metavar="FICHERO",
+        default=None,
+        help="Guardar resultado como JSON en FICHERO (por defecto stdout).",
+    )
+    output_group.add_argument(
+        "--indent",
+        type=int,
+        default=2,
+        metavar="N",
+        help="Indentación del JSON. Defecto: 2.",
+    )
+
+    # ── Opciones de cuenta ────────────────────────────────────────────────────
+    account_group = parser.add_argument_group("opciones de cuenta")
+    account_group.add_argument(
+        "--account",
+        metavar="IDENTIFICADOR",
+        default=None,
+        help="Forzar una cuenta concreta (account_id, username o c_user).",
+    )
+
+    # ── Opciones generales ────────────────────────────────────────────────────
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        default=False,
+        help="Logging detallado y artefactos en data/debug_artifacts/.",
+    )
+    return parser
+
+
+def _run_search_cli(argv: list[str]) -> None:
+    """Ejecuta el flujo CLI de búsquedas (``reaper search ...``).
+
+    Genera la URL de búsqueda con ``generate_fb_recent_search_url`` y
+    delega en ``Reaper.scrape()``. Construye siempre un ``AccountManager``
+    porque las búsquedas requieren sesión autenticada.
+    """
+    setup_logging(
+        level="DEBUG" if "--debug" in argv else "INFO",
+        use_color=None,
+    )
+    from reaper.auth import AccountManager
+    from reaper.utils import generate_fb_recent_search_url
+
+    parser = build_search_parser()
+    args = parser.parse_args(argv[1:])
+
+    url = generate_fb_recent_search_url(args.query, time_range=args.time_range)
+    logger.info("URL de búsqueda generada: %s", url)
+
+    try:
+        result = asyncio.run(
+            Reaper(account_manager=AccountManager()).scrape(
+                url,
+                headless=args.headless,
+                debug=args.debug,
+                screenshot=args.screenshot,
+                auto_scroll=args.auto_scroll,
+                infinity_scroll=args.infinity_scroll,
+                proxy_server=args.proxy_server,
+                proxy_username=args.proxy_username,
+                proxy_password=args.proxy_password,
+                account=args.account,
+            )
+        )
+    except ValueError as exc:
+        _exit_error(str(exc), code=2)
+    except UnsupportedPlatformError as exc:
+        _exit_error(str(exc), code=3)
+    except ScrapingError as exc:
+        _exit_error(str(exc), code=4)
+
+    _write_output(result, args.output, args.indent)
+
+
 def main() -> None:
     """Punto de entrada principal de la CLI.
 
@@ -388,6 +586,11 @@ def main() -> None:
     # Detección del subcomando de acciones antes de construir el parser de scrape.
     if len(sys.argv) > 1 and sys.argv[1] == "action":
         _run_action_cli(sys.argv[1:])
+        return
+
+    # Detección del subcomando de búsqueda (reaper search <query> ...).
+    if len(sys.argv) > 1 and sys.argv[1] == "search":
+        _run_search_cli(sys.argv[1:])
         return
 
     parser = build_parser()

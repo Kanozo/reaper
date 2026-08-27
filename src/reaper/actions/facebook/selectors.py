@@ -151,7 +151,11 @@ SHARE_SUBMIT: tuple[str, ...] = (
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Caja de escribir un comentario bajo una publicación.
+# Primero labels españoles (UI es-*), luego ingleses, y un genérico final.
 COMMENT_BOX: tuple[str, ...] = (
+    "div[contenteditable='true'][role='textbox'][aria-label*='comentar' i]",
+    "textarea[placeholder*='comentar' i]",
+    "textarea[placeholder*='escribe un comentario' i]",
     "div[contenteditable='true'][role='textbox'][aria-label*='comment' i]",
     "textarea[placeholder*='comment' i]",
     "div[contenteditable='true'][role='textbox']",
@@ -161,6 +165,10 @@ COMMENT_BOX: tuple[str, ...] = (
 COMMENT_SUBMIT: tuple[str, ...] = (
     "[data-testid='comment-composer-submit']",
     "div[aria-label='Post'][role='button']",
+    "div[aria-label='Publicar'][role='button']",
+    "span[aria-label='Publicar']",
+    "div[aria-label='Enviar'][role='button']",
+    "span[aria-label='Enviar']",
     "span[role='button'][aria-label='Add comment']",
     "span[aria-label='Post']",
 )
@@ -235,4 +243,34 @@ POST_LINK_PATTERNS: tuple[str, ...] = (
 COMMENT_ID_PATTERNS: tuple[str, ...] = (
     r"comment_id=(\d+)",
     r"delete_comment_id=(\d+)",
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Feed en vivo (comentario sin salir del feed)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Artículo (post) del feed de un grupo o timeline. Se usa SCOPED a la página
+# para enumerar posts y como contenedor para los selectores de comentario.
+FEED_ARTICLE: tuple[str, ...] = (
+    "div[role='article']",
+)
+
+# Enlace/botón "Comentar" dentro de un artículo: abre el composer inline.
+# Se prueba SCOPED al artículo (article.locator(selector)).
+# En UI española de grupos el trigger es un div[role=button] con TEXTO
+# "Responder"/"Comentar" SIN aria-label → se selecciona por texto exacto.
+COMMENT_LINK: tuple[str, ...] = (
+    "xpath=.//div[@role='button'][normalize-space(.)='Responder']",
+    "xpath=.//div[@role='button'][normalize-space(.)='Comentar']",
+    "xpath=.//span[@role='button'][normalize-space(.)='Responder']",
+    "xpath=.//span[@role='button'][normalize-space(.)='Comentar']",
+    "xpath=.//div[@role='button'][normalize-space(.)='Comment']",
+    "xpath=.//span[@role='button'][normalize-space(.)='Comment']",
+    "xpath=.//div[@role='button'][normalize-space(.)='Reply']",
+    "span[role='button'][aria-label*='comentar' i]",
+    "div[role='button'][aria-label*='comentar' i]",
+    "span[role='button'][aria-label*='comment' i]",
+    "div[role='button'][aria-label*='comment' i]",
+    "[data-testid='UFI2ComposerInput/comment-toggle']",
 )

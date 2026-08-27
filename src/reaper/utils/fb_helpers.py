@@ -154,6 +154,30 @@ def is_facebook_video_url(url: str) -> bool:
     return any(re.search(patron, url, re.IGNORECASE) for patron in patrones_video)
 
 
+def normalize_search_query(query: str) -> str:
+    """Normaliza una consulta de búsqueda de Facebook.
+
+    - Recorta espacios en los extremos.
+    - Colapsa espacios internos múltiples a uno solo
+      (``"  hola   mundo  "`` → ``"hola mundo"``).
+    - Conserva el ``#`` inicial: indica búsqueda por hashtag y se envía
+      codificado (``%23``) para que Facebook contemple el símbolo.
+
+    Args:
+        query: Consulta tal como la escribe el usuario.
+
+    Returns:
+        Consulta normalizada (puede quedar vacía si solo había espacios).
+
+    Examples:
+        >>> normalize_search_query("  hola   mundo  ")
+        'hola mundo'
+        >>> normalize_search_query("#cuba")
+        '#cuba'
+    """
+    return " ".join(query.split())
+
+
 def generate_fb_recent_search_url(
     query: str,
     time_range: Literal["hour", "today", "week", "month", "year"] = "hour",
@@ -164,21 +188,33 @@ def generate_fb_recent_search_url(
     Facebook con una ventana de tiempo aplicada. El filtro se codifica en
     base64 según el formato interno de la interfaz web de Facebook.
 
+    La consulta admite una o varias palabras separadas por espacios y el
+    símbolo ``#`` inicial (hashtag), que se envía codificado para que la
+    búsqueda lo contemple.
+
     Args:
-        query: Palabra clave o hashtag. El símbolo ``#`` inicial se elimina
-               automáticamente.
+        query: Palabra clave, hashtag (``#cuba``) o frase (``café cubano``).
+               Se normalizan los espacios; no se elimina ningún carácter.
         time_range: Ventana temporal: ``"hour"``, ``"today"``, ``"week"``,
                     ``"month"`` o ``"year"``.
 
     Returns:
         URL completa lista para usar en scraping o navegación.
 
+    Raises:
+        ValueError: Si la consulta queda vacía tras normalizar.
+
     Examples:
         >>> url = generate_fb_recent_search_url("#Cuba", time_range="today")
-        >>> url.startswith("https://www.facebook.com/search/posts?q=Cuba")
+        >>> url.startswith("https://www.facebook.com/search/posts?q=%23Cuba")
+        True
+        >>> url = generate_fb_recent_search_url("cafe cuba")
+        >>> "q=cafe%20cuba" in url
         True
     """
-    clean_query = query.lstrip("#")
+    clean_query = normalize_search_query(query)
+    if not clean_query:
+        raise ValueError("La consulta de búsqueda está vacía.")
 
     filters_obj = {
         "recent_posts:0": json.dumps({"name": "recent_posts", "args": ""}),

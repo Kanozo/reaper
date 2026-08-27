@@ -42,17 +42,20 @@ Diseño para testabilidad: acepta un ``browser_factory`` (mismo mecanismo que
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
 from reaper.actions.actor import SessionActor
 from reaper.actions.facebook import flows
+from reaper.actions.feed_session import GroupFeedSession
 from reaper.actions.models import ActionError, ActionResult, ActionType
 from reaper.actions.storage.base import BaseActionStorage
 from reaper.actions.storage.config import build_action_storage
 from reaper.actions.utils import (
     cookies_differ,
+    extract_group_id,
     resolve_group,
     resolve_profile_url,
     validate_image_paths,
@@ -154,13 +157,11 @@ class ActionManager:
                 las imágenes no son válidas.
         """
         text_clean = (text or "").strip()
-        images_ok = [str(path) for path in validate_image_paths(
-            [str(p) for p in images] if images else None
-        )]
+        images_ok = [
+            str(path) for path in validate_image_paths([str(p) for p in images] if images else None)
+        ]
         if not text_clean and not images_ok:
-            raise ActionError(
-                "La publicación necesita al menos texto o una imagen."
-            )
+            raise ActionError("La publicación necesita al menos texto o una imagen.")
 
         if group is not None:
             group_url = resolve_group(group, self._base_url)
@@ -275,6 +276,104 @@ class ActionManager:
             },
         )
 
+    @asynccontextmanager
+    async def feed_session(
+        self,
+        *,
+        account: str | None = None,
+    ) -> AsyncIterator[GroupFeedSession]:
+        """Sesión de navegador LARGA para operar feeds sin cerrarla.
+
+        Abre Camoufox UNA vez (cookies inyectadas, sin URL destino), expone
+        un :class:`GroupFeedSession` para navegar grupos, hacer scroll y
+        comentar artículos en vivo, y al salir persiste las cookies
+        actualizadas. Cada comentario se registra individualmente en el
+        storage de acciones y en el historial de actividad de la cuenta.
+
+        Args:
+            account: Cuenta a forzar. ``None`` = rotación automática.
+
+        Yields:
+            ``GroupFeedSession`` operativo sobre la página autenticada.
+
+        Raises:
+            ActionError: Si la cuenta es inválida o el navegador no abre.
+        """
+        profile, original_cookies = await self._resolve_account(account)
+        session: GroupFeedSession | None = None
+
+        def _build_result(outcome: dict[str, Any], text: str) -> ActionResult:
+            return ActionResult(
+                action=ActionType.COMMENT.value,
+                account_id=profile.account_id,
+                account_username=profile.username,
+                status=outcome.get("status", "error"),
+                post_url=outcome.get("post_url"),
+                comment_id=outcome.get("comment_id"),
+                group=extract_group_id(str(session.page.url)) if session else None,
+                text=text,
+                note=outcome.get("note"),
+                error=outcome.get("error"),
+            )
+
+        try:
+            async with self._actor.session(
+                cookies=original_cookies, traffic_debug=True
+            ) as handle:
+
+                async def on_result(outcome: dict[str, Any], text: str) -> None:
+                    result = _build_result(outcome, text)
+                    try:
+                        await self._storage.add(result)
+                    except Exception:
+                        logger.exception(
+                            "No se pudo persistir el resultado del feed | %s",
+                            result.action_id,
+                        )
+                    if self._account_manager is None:
+                        return
+                    if result.status == "ok":
+                        await self._account_manager.record_success(profile.account_id)
+                    else:
+                        await self._account_manager.record_failure(
+                            profile.account_id, result.error or "feed_comment_error"
+                        )
+
+                session = GroupFeedSession(
+                    handle.page,
+                    interceptor=handle.interceptor,
+                    on_result=on_result,
+                )
+                yield session
+            updated_cookies = handle.updated_cookies
+        except ActionError as exc:
+            await self._record_feed_session_failure(profile, exc)
+            raise
+        except Exception as exc:
+            logger.exception("Sesión de feed fallida | cuenta=%s", profile.account_id)
+            wrapped = ActionError(f"Error en sesión de feed: {exc}")
+            await self._record_feed_session_failure(profile, wrapped)
+            raise wrapped from exc
+        finally:
+            session = None
+
+        if (
+            updated_cookies
+            and self._account_manager is not None
+            and cookies_differ(original_cookies, updated_cookies)
+        ):
+            try:
+                await self._account_manager.import_cookies(profile.account_id, updated_cookies)
+                logger.debug(
+                    "Cookies actualizadas tras sesión de feed | %s",
+                    profile.account_id,
+                )
+            except Exception:
+                logger.exception(
+                    "No se pudieron persistir cookies del feed | %s",
+                    profile.account_id,
+                )
+
     async def like(
         self,
         *,
@@ -339,15 +438,12 @@ class ActionManager:
         manager = self._account_manager
         if manager is None:
             raise ActionError(
-                "Las acciones de escritura requieren un AccountManager "
-                "con cuentas autenticadas."
+                "Las acciones de escritura requieren un AccountManager con cuentas autenticadas."
             )
 
         profile = await manager.get_account_for_request("facebook", preferred=account)
         if profile is None:
-            raise ActionError(
-                "No hay cuentas de Facebook disponibles para ejecutar la acción."
-            )
+            raise ActionError("No hay cuentas de Facebook disponibles para ejecutar la acción.")
         if not profile.is_selectable:
             raise ActionError(
                 f"La cuenta '{profile.username}' no es seleccionable "
@@ -356,9 +452,7 @@ class ActionManager:
 
         cookies = await manager.load_cookies("facebook", profile.account_id)
         if not cookies:
-            raise ActionError(
-                f"La cuenta '{profile.username}' no tiene cookies almacenadas."
-            )
+            raise ActionError(f"La cuenta '{profile.username}' no tiene cookies almacenadas.")
 
         logger.debug(
             "Cuenta resuelta | account_id=%s | username=%s",
@@ -451,6 +545,19 @@ class ActionManager:
         await self._persist(account, cookies, updated_cookies, result)
         return result
 
+    async def _record_feed_session_failure(self, profile: Any, exc: Exception) -> None:
+        """Registra en la salud de la cuenta un fallo de sesión completa.
+
+        Sin esto, el rotador seguiría eligiendo cuentas con cookies muertas:
+        el fallo de sesión no pasa por ``_persist`` (no hubo ActionResult).
+        """
+        if self._account_manager is None:
+            return
+        try:
+            await self._account_manager.record_failure(profile.account_id, f"feed_session: {exc}")
+        except Exception:
+            logger.exception("No se pudo registrar el fallo de sesión | %s", profile.account_id)
+
     async def _persist(
         self,
         account: Any,
@@ -468,14 +575,9 @@ class ActionManager:
         if result.status == "ok":
             await manager.record_success(account.account_id)
         else:
-            await manager.record_failure(
-                account.account_id, result.error or "unknown_action_error"
-            )
+            await manager.record_failure(account.account_id, result.error or "unknown_action_error")
 
-        if (
-            updated_cookies
-            and cookies_differ(original_cookies, updated_cookies)
-        ):
+        if updated_cookies and cookies_differ(original_cookies, updated_cookies):
             try:
                 await manager.import_cookies(account.account_id, updated_cookies)
                 logger.debug(
